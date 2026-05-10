@@ -189,3 +189,19 @@ td{padding:11px 14px;vertical-align:middle;}
   .import-grid{grid-template-columns:1fr;}
   .form-grid{grid-template-columns:1fr;}
 }
+.pin-actions{display:none;gap:4px;margin-top:4px;justify-content:center;}
+.map-pin:hover .pin-actions{display:flex;}
+.pin-btn{font-size:0.7rem;padding:2px 6px;border-radius:4px;cursor:pointer;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.15);transition:all 0.2s;}
+.pin-btn:hover{transform:scale(1.1);}
+.config-btn{background:#6366f1;color:#fff;}
+.gw-btn{background:#10b981;color:#fff;}
+.del-btn{background:#ef4444;color:#fff;}
+.gw-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,0.25);z-index:300;width:480px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--border);}
+.gw-popup-header{padding:16px 20px;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;display:flex;align-items:center;justify-content:space-between;}
+.gw-popup-header h4{font-size:0.95rem;font-weight:700;}
+.gw-popup-header button{background:rgba(255,255,255,0.1);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:0.9rem;}
+.gw-popup-body{padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.gw-node-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.2s;font-size:0.82rem;}
+.gw-node-item:hover{background:#f5f3ff;border-color:var(--accent);}
+#mapCanvas.drag-over{background-color:#f0f4ff;border:2px dashed var(--accent);}
+
