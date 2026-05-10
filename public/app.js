@@ -417,14 +417,115 @@ function addPinToMap(pin) {
   el.className = 'map-pin';
   el.style.left = pin.x + '%';
   el.style.top = pin.y + '%';
+  el.dataset.pinId = pin.id;
+
   el.innerHTML = `
-    <div class="pin-marker ${pin.type}">${pin.type === 'gw' ? '📡' : '🔌'}</div>
-    <div class="pin-label">${pin.label}</div>`;
-  el.addEventListener('dblclick', () => {
-    currentSite.map_data = (currentSite.map_data || []).filter(p => p.id !== pin.id);
-    el.remove();
-  });
+    <div class="pin-marker ${pin.type}" title="${pin.label}">
+      ${pin.type === 'gw' ? '📡' : '🔌'}
+    </div>
+    <div class="pin-label">${pin.label}</div>
+    <div class="pin-actions">
+      ${pin.type === 'nd' ? `<span class="pin-btn config-btn" onclick="openPinConfig(${pin.nodeId})">⚙️ Config</span>` : ''}
+      ${pin.type === 'gw' ? `<span class="pin-btn gw-btn" onclick="showGatewayNodes(${pin.gatewayId})">👁️ Nodes</span>` : ''}
+      <span class="pin-btn del-btn" onclick="deletePin(${pin.id})">🗑️</span>
+    </div>
+  `;
+
+  // Node pin - click to config
+  if (pin.type === 'nd') {
+    el.setAttribute('draggable', true);
+    el.style.cursor = 'grab';
+    el.querySelector('.pin-marker').addEventListener('click', e => {
+      e.stopPropagation();
+      openPinConfig(pin.nodeId);
+    });
+    el.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('pinId', String(pin.id));
+      el.style.opacity = '0.5';
+    });
+    el.addEventListener('dragend', e => {
+      el.style.opacity = '1';
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+      const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+      el.style.left = x + '%';
+      el.style.top = y + '%';
+      const p = currentSite.map_data.find(p => p.id === pin.id);
+      if (p) { p.x = x; p.y = y; }
+      toast('Pin moved! 💾 Save karo.', 'info');
+    });
+  }
+
+  // Gateway pin - click to show nodes
+  if (pin.type === 'gw') {
+    el.querySelector('.pin-marker').addEventListener('click', e => {
+      e.stopPropagation();
+      showGatewayNodes(pin.gatewayId);
+    });
+  }
+
   canvas.appendChild(el);
+}
+
+// Canvas drag over
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('mapCanvas');
+  if (canvas) {
+    canvas.addEventListener('dragover', e => {
+      e.preventDefault();
+      canvas.classList.add('drag-over');
+    });
+    canvas.addEventListener('dragleave', () => {
+      canvas.classList.remove('drag-over');
+    });
+    canvas.addEventListener('drop', e => {
+      canvas.classList.remove('drag-over');
+    });
+  }
+});
+
+function deletePin(pinId) {
+  currentSite.map_data = (currentSite.map_data || []).filter(p => p.id !== pinId);
+  document.querySelector(`[data-pin-id="${pinId}"]`)?.remove();
+  toast('Pin deleted', 'success');
+}
+
+function openPinConfig(nodeId) {
+  if (!nodeId) { toast('Node linked nahi hai. Pin dobara lagao.', 'warning'); return; }
+  const node = nodes.find(n => n.id === parseInt(nodeId));
+  if (!node) { toast('Node nahi mila!', 'error'); return; }
+  openCongregation(node.id);
+}
+
+function showGatewayNodes(gatewayId) {
+  if (!gatewayId) { toast('Gateway linked nahi hai', 'warning'); return; }
+  const gw = gateways.find(g => g.id === parseInt(gatewayId));
+  const gwNodes = nodes.filter(n => n.gateway_id === parseInt(gatewayId));
+  const existing = document.getElementById('gwPopup');
+  if (existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'gwPopup';
+  popup.className = 'gw-popup';
+  popup.innerHTML = `
+    <div class="gw-popup-header">
+      <h4>📡 ${gw ? gw.model : 'Gateway'} — ${gw ? gw.serial_no : ''}</h4>
+      <button onclick="document.getElementById('gwPopup').remove()">✕</button>
+    </div>
+    <div class="gw-popup-body">
+      ${gwNodes.length === 0
+        ? '<p style="color:var(--muted);text-align:center;padding:20px;">No nodes linked to this gateway</p>'
+        : gwNodes.map(n => `
+          <div class="gw-node-item" onclick="openCongregation(${n.id})">
+            <span class="badge badge-purple">${n.model}</span>
+            <span class="mono">${n.serial_no}</span>
+            ${n.is_ai ? '<span class="badge badge-ai">🤖 AI</span>' : ''}
+            <span class="badge ${n.status === 'active' ? 'badge-green' : 'badge-red'}">${n.status}</span>
+            <span class="pin-btn config-btn">⚙️ Config</span>
+          </div>`).join('')
+      }
+    </div>
+  `;
+  document.body.appendChild(popup);
 }
 
 function addPin(type) {
@@ -437,9 +538,24 @@ document.getElementById('mapCanvas').addEventListener('click', e => {
   const rect = e.currentTarget.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
   const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
-  const label = prompt(`Label for this ${addingPin}:`, addingPin === 'gateway' ? 'GW-01' : 'ND-01');
+  const label = prompt(`Label:`, addingPin === 'gateway' ? 'GW-01' : 'ND-01');
   if (!label) { addingPin = null; return; }
-  const pin = { id: Date.now(), type: addingPin === 'gateway' ? 'gw' : 'nd', x, y, label };
+
+  let nodeId = null, gatewayId = null;
+  if (addingPin === 'node' && nodes.length > 0) {
+    const sel = nodes.map((n, i) => `${i + 1}. ${n.model} - ${n.serial_no}`).join('\n');
+    const choice = prompt(`Konsa node select karo?\n\n${sel}\n\nNumber daalo:`);
+    const idx = parseInt(choice) - 1;
+    if (idx >= 0 && nodes[idx]) nodeId = nodes[idx].id;
+  }
+  if (addingPin === 'gateway' && gateways.length > 0) {
+    const sel = gateways.map((g, i) => `${i + 1}. ${g.model} - ${g.serial_no}`).join('\n');
+    const choice = prompt(`Konsa gateway select karo?\n\n${sel}\n\nNumber daalo:`);
+    const idx = parseInt(choice) - 1;
+    if (idx >= 0 && gateways[idx]) gatewayId = gateways[idx].id;
+  }
+
+  const pin = { id: Date.now(), type: addingPin === 'gateway' ? 'gw' : 'nd', x, y, label, nodeId, gatewayId };
   if (!currentSite.map_data) currentSite.map_data = [];
   currentSite.map_data.push(pin);
   addPinToMap(pin);
@@ -449,7 +565,7 @@ document.getElementById('mapCanvas').addEventListener('click', e => {
 async function saveMap() {
   if (!currentSite) return;
   await api(`/api/sites/${currentSite.id}/map`, 'PUT', { map_data: currentSite.map_data });
-  toast('Map saved!', 'success');
+  toast('Map saved! ✅', 'success');
 }
 
 async function submitSite(e) {
