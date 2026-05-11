@@ -266,215 +266,374 @@ async function deleteNode(id) {
 let nodeDataCharts = {};
 let nodeDataInterval = null;
 
-function openNodeData(nodeId) {
-  const node = nodes.find(n => n.id === nodeId);
-  if (!node) return;
+let nodeDataCharts = {}, nodeDataInterval = null, currentNodeForData = null, allNodeData = [];
 
-  const existing = document.getElementById('nodeDataModal');
-  if (existing) existing.remove();
+const NODE_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="4" fill="#6366f1"/><rect x="6" y="6" width="4" height="6" rx="1" fill="white"/><rect x="14" y="6" width="4" height="6" rx="1" fill="white"/><rect x="6" y="15" width="12" height="3" rx="1" fill="white"/><rect x="9" y="18" width="2" height="4" fill="#6366f1"/><rect x="13" y="18" width="2" height="4" fill="#6366f1"/></svg>`;
+
+const SENSOR_LIST = [
+  { key:'temp',  label:'Temperature',   unit:'°C',   color:'#ef4444', min:0, max:100  },
+  { key:'vib',   label:'Vibration',     unit:'mm/s', color:'#6366f1', min:0, max:20   },
+  { key:'press', label:'Pressure',      unit:'bar',  color:'#10b981', min:0, max:10   },
+  { key:'rpm',   label:'RPM',           unit:'RPM',  color:'#f59e0b', min:0, max:3000 },
+  { key:'mag',   label:'Magnetic Flux', unit:'mT',   color:'#8b5cf6', min:0, max:100  },
+  { key:'ultra', label:'Ultrasound',    unit:'dB',   color:'#06b6d4', min:0, max:100  },
+];
+
+const INTERVAL_OPTIONS = [
+  { label:'5 Minutes',  ms:300000   },
+  { label:'15 Minutes', ms:900000   },
+  { label:'30 Minutes', ms:1800000  },
+  { label:'1 Hour',     ms:3600000  },
+  { label:'2 Hours',    ms:7200000  },
+  { label:'4 Hours',    ms:14400000 },
+  { label:'8 Hours',    ms:28800000 },
+  { label:'12 Hours',   ms:43200000 },
+  { label:'24 Hours',   ms:86400000 },
+];
+
+function openNodeData(nodeId) {
+  currentNodeForData = nodes.find(n => n.id === nodeId);
+  if (!currentNodeForData) return;
+  allNodeData = [];
+  document.getElementById('nodeDataModal')?.remove();
+
+  const yr = new Date().getFullYear();
+  const yearOpts = Array.from({length:5},(_,i)=>yr-i).map(y=>`<option value="${y}">${y}</option>`).join('');
+  const monthOpts = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+  const intOpts = INTERVAL_OPTIONS.map((o,i)=>`<option value="${o.ms}" ${i===0?'selected':''}>${o.label}</option>`).join('');
+  const senOpts = SENSOR_LIST.map(s=>`<option value="${s.key}">${s.label} (${s.unit})</option>`).join('');
 
   const modal = document.createElement('div');
   modal.id = 'nodeDataModal';
   modal.className = 'modal-overlay';
   modal.style.display = 'flex';
   modal.innerHTML = `
-    <div class="modal" style="max-width:900px;width:95%;">
-      <div class="modal-header">
-        <h3>📊 ${node.model} — ${node.serial_no} Live Data</h3>
-        <button class="modal-close" onclick="closeNodeData()">✕</button>
+    <div class="modal" style="max-width:960px;width:96%;max-height:92vh;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;border-radius:16px 16px 0 0;padding:16px 24px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;background:rgba(99,102,241,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;">${NODE_ICON_SVG}</div>
+          <div>
+            <h3 style="color:#fff;font-size:1rem;margin:0;">📊 ${currentNodeForData.model} — ${currentNodeForData.serial_no}</h3>
+            <p style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:2px 0 0;">NeuroVibe AI Technologies Pvt. Ltd.</p>
+          </div>
+        </div>
+        <button class="modal-close" style="color:#fff;background:rgba(255,255,255,0.1);" onclick="closeNodeData()">✕</button>
       </div>
-      <div class="modal-body" style="padding:16px;">
+      <div style="padding:16px;overflow-y:auto;max-height:80vh;">
 
-        <!-- DATA MODE TABS -->
-        <div class="data-tabs">
-          <button class="data-tab active" onclick="switchDataTab('overall',this)">📈 Overall Data</button>
-          <button class="data-tab" onclick="switchDataTab('spectrum',this)">🌊 Spectrum Data</button>
-          <button class="data-tab" onclick="switchDataTab('rms',this)">📉 RMS Mode</button>
-          <button class="data-tab" onclick="switchDataTab('water',this)">💧 Water Graphic</button>
+        <div class="nd-control-bar">
+          <div class="nd-ctrl-group">
+            <label>📋 View Mode</label>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <button class="data-tab active" onclick="switchDataTab('overall',this)">📈 Overall</button>
+              <button class="data-tab" onclick="switchDataTab('spectrum',this)">🌊 Spectrum</button>
+              <button class="data-tab" onclick="switchDataTab('rms',this)">📉 RMS</button>
+              <button class="data-tab" onclick="switchDataTab('water',this)">💧 Water</button>
+              <button class="data-tab" onclick="switchDataTab('ptp',this)">🎯 Pick to Pick</button>
+            </div>
+          </div>
+          <div class="nd-ctrl-group">
+            <label>🔌 Sensor</label>
+            <select id="sensorSelect" onchange="onSensorChange()" class="nd-select">
+              <option value="all">All Sensors</option>${senOpts}
+            </select>
+          </div>
+          <div class="nd-ctrl-group">
+            <label>⏱️ Interval</label>
+            <select id="dataIntervalSel" onchange="onIntervalChange()" class="nd-select">${intOpts}</select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="live-dot"></div>
+            <span style="font-size:0.78rem;color:var(--success);font-weight:700;">LIVE</span>
+          </div>
         </div>
 
-        <!-- TIME CONFIG -->
-        <div class="time-config">
-          <span style="font-size:0.82rem;font-weight:600;color:var(--muted);">⏱️ Data Interval:</span>
-          <select id="overallInterval" onchange="updateDataInterval()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:0.82rem;">
-            <option value="1000">1 Second</option>
-            <option value="2000" selected>2 Seconds</option>
-            <option value="5000">5 Seconds</option>
-            <option value="10000">10 Seconds</option>
-            <option value="30000">30 Seconds</option>
-            <option value="60000">1 Minute</option>
-          </select>
-          <span style="font-size:0.82rem;font-weight:600;color:var(--muted);">Spectrum Interval:</span>
-          <select id="spectrumInterval" onchange="updateDataInterval()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:0.82rem;">
-            <option value="500">0.5 Second</option>
-            <option value="1000" selected>1 Second</option>
-            <option value="2000">2 Seconds</option>
-            <option value="5000">5 Seconds</option>
-          </select>
-          <div class="live-dot"></div>
-          <span style="font-size:0.78rem;color:var(--success);font-weight:600;">LIVE</span>
+        <div class="nd-download-bar">
+          <span style="font-size:0.82rem;font-weight:700;">📥 Download:</span>
+          <select id="dlYear" class="nd-select">${yearOpts}</select>
+          <select id="dlMonth" class="nd-select">${monthOpts}</select>
+          <select id="dlSensor" class="nd-select"><option value="all">All Sensors</option>${senOpts}</select>
+          <select id="dlFormat" class="nd-select"><option value="csv">CSV</option><option value="json">JSON</option></select>
+          <button class="btn btn-primary btn-sm" onclick="downloadNodeData()">⬇ Download</button>
         </div>
 
-        <!-- OVERALL DATA TAB -->
         <div id="tab-overall" class="data-tab-content active">
-          <div class="data-charts-grid">
-            <div class="data-chart-card">
-              <div class="data-chart-title">🌡️ Temperature (°C)</div>
-              <canvas id="tempLiveChart" height="120"></canvas>
-            </div>
-            <div class="data-chart-card">
-              <div class="data-chart-title">📳 Vibration (mm/s)</div>
-              <canvas id="vibLiveChart" height="120"></canvas>
-            </div>
-            <div class="data-chart-card">
-              <div class="data-chart-title">🔵 Pressure (bar)</div>
-              <canvas id="pressLiveChart" height="120"></canvas>
-            </div>
-            <div class="data-chart-card">
-              <div class="data-chart-title">⚡ RPM</div>
-              <canvas id="rpmLiveChart" height="120"></canvas>
-            </div>
-          </div>
-          <!-- LIVE VALUES -->
-          <div class="live-values-grid" id="liveValuesGrid"></div>
+          <div class="nd-charts-grid" id="overallGrid"></div>
+          <div class="nd-live-grid" id="liveValuesGrid"></div>
         </div>
-
-        <!-- SPECTRUM TAB -->
         <div id="tab-spectrum" class="data-tab-content">
-          <div class="data-chart-card" style="margin-bottom:16px;">
-            <div class="data-chart-title">🌊 Vibration Spectrum (FFT)</div>
-            <canvas id="spectrumChart" height="150"></canvas>
+          <div class="nd-chart-card" style="margin-bottom:14px;">
+            <div class="nd-chart-title">🌊 Vibration Spectrum (FFT)</div>
+            <canvas id="spectrumChart" height="140"></canvas>
           </div>
-          <div class="data-chart-card">
-            <div class="data-chart-title">🔊 Ultrasound Spectrum</div>
-            <canvas id="ultraChart" height="150"></canvas>
+          <div class="nd-chart-card">
+            <div class="nd-chart-title">🔊 Ultrasound Spectrum</div>
+            <canvas id="ultraChart" height="140"></canvas>
           </div>
         </div>
-
-        <!-- RMS TAB -->
         <div id="tab-rms" class="data-tab-content">
-          <div class="rms-grid">
-            <div class="rms-card">
-              <div class="rms-label">Vibration RMS</div>
-              <div class="rms-value" id="rmsVib">--</div>
-              <div class="rms-unit">mm/s</div>
-              <canvas id="rmsVibChart" height="80"></canvas>
-            </div>
-            <div class="rms-card">
-              <div class="rms-label">Temperature RMS</div>
-              <div class="rms-value" id="rmsTemp">--</div>
-              <div class="rms-unit">°C</div>
-              <canvas id="rmsTempChart" height="80"></canvas>
-            </div>
-            <div class="rms-card">
-              <div class="rms-label">Pressure RMS</div>
-              <div class="rms-value" id="rmsPress">--</div>
-              <div class="rms-unit">bar</div>
-              <canvas id="rmsPressChart" height="80"></canvas>
-            </div>
-            <div class="rms-card">
-              <div class="rms-label">Magnetic Flux RMS</div>
-              <div class="rms-value" id="rmsMag">--</div>
-              <div class="rms-unit">mT</div>
-              <canvas id="rmsMagChart" height="80"></canvas>
-            </div>
-          </div>
+          <div class="nd-rms-grid" id="rmsGrid"></div>
         </div>
-
-        <!-- WATER GRAPHIC TAB -->
         <div id="tab-water" class="data-tab-content">
-          <div class="water-grid">
-            <div class="water-card">
-              <div class="water-label">🌡️ Temperature</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfTemp" style="height:70%;background:linear-gradient(180deg,#ef4444,#dc2626);"></div>
-                  <div class="water-bubbles" id="wbTemp"></div>
-                </div>
-                <div class="water-scale">
-                  <span>100°C</span><span>75°C</span><span>50°C</span><span>25°C</span><span>0°C</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvTemp">--°C</div>
-            </div>
-            <div class="water-card">
-              <div class="water-label">📳 Vibration</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfVib" style="height:40%;background:linear-gradient(180deg,#6366f1,#4f46e5);"></div>
-                  <div class="water-bubbles" id="wbVib"></div>
-                </div>
-                <div class="water-scale">
-                  <span>20</span><span>15</span><span>10</span><span>5</span><span>0</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvVib">-- mm/s</div>
-            </div>
-            <div class="water-card">
-              <div class="water-label">🔵 Pressure</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfPress" style="height:50%;background:linear-gradient(180deg,#10b981,#059669);"></div>
-                  <div class="water-bubbles" id="wbPress"></div>
-                </div>
-                <div class="water-scale">
-                  <span>10</span><span>7.5</span><span>5</span><span>2.5</span><span>0</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvPress">-- bar</div>
-            </div>
-            <div class="water-card">
-              <div class="water-label">⚡ RPM</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfRpm" style="height:60%;background:linear-gradient(180deg,#f59e0b,#d97706);"></div>
-                  <div class="water-bubbles" id="wbRpm"></div>
-                </div>
-                <div class="water-scale">
-                  <span>3000</span><span>2250</span><span>1500</span><span>750</span><span>0</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvRpm">-- RPM</div>
-            </div>
-            <div class="water-card">
-              <div class="water-label">🧲 Magnetic Flux</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfMag" style="height:45%;background:linear-gradient(180deg,#8b5cf6,#6d28d9);"></div>
-                  <div class="water-bubbles" id="wbMag"></div>
-                </div>
-                <div class="water-scale">
-                  <span>100</span><span>75</span><span>50</span><span>25</span><span>0</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvMag">-- mT</div>
-            </div>
-            <div class="water-card">
-              <div class="water-label">🔊 Ultrasound</div>
-              <div class="water-tank-wrap">
-                <div class="water-tank">
-                  <div class="water-fill" id="wfUltra" style="height:35%;background:linear-gradient(180deg,#06b6d4,#0891b2);"></div>
-                  <div class="water-bubbles" id="wbUltra"></div>
-                </div>
-                <div class="water-scale">
-                  <span>100</span><span>75</span><span>50</span><span>25</span><span>0</span>
-                </div>
-              </div>
-              <div class="water-value" id="wvUltra">-- dB</div>
-            </div>
+          <div class="nd-water-grid" id="waterGrid"></div>
+        </div>
+        <div id="tab-ptp" class="data-tab-content">
+          <div style="margin-bottom:12px;">
+            <h4 style="font-size:0.95rem;font-weight:700;">🎯 Pick to Pick Analysis</h4>
+            <p style="font-size:0.78rem;color:var(--muted);">Peak (Max) aur Trough (Min) ka difference</p>
+          </div>
+          <div class="nd-ptp-grid" id="ptpGrid"></div>
+          <div class="nd-chart-card" style="margin-top:14px;">
+            <div class="nd-chart-title">🎯 Pick to Pick Trend</div>
+            <canvas id="ptpChart" height="130"></canvas>
           </div>
         </div>
 
       </div>
-    </div>
-  `;
+    </div>`;
 
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) closeNodeData(); });
-
   initNodeDataCharts();
-  startNodeDataInterval();
+  startLiveData();
 }
+
+function closeNodeData() {
+  if (nodeDataInterval) clearInterval(nodeDataInterval);
+  nodeDataInterval = null;
+  Object.values(nodeDataCharts).forEach(c => { try { c.destroy(); } catch {} });
+  nodeDataCharts = {};
+  document.getElementById('nodeDataModal')?.remove();
+}
+
+function switchDataTab(tab, btn) {
+  document.querySelectorAll('.data-tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.data-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${tab}`)?.classList.add('active');
+  btn.classList.add('active');
+}
+
+function onSensorChange() { renderOverallCharts(); }
+
+function onIntervalChange() {
+  if (nodeDataInterval) clearInterval(nodeDataInterval);
+  startLiveData();
+}
+
+function startLiveData() {
+  updateLiveData();
+  nodeDataInterval = setInterval(updateLiveData, 3000);
+}
+
+function initNodeDataCharts() {
+  renderOverallCharts();
+  renderSpectrumCharts();
+  renderRmsCards();
+  renderWaterCards();
+  renderPtpCards();
+}
+
+function renderOverallCharts() {
+  const grid = document.getElementById('overallGrid');
+  if (!grid) return;
+  const sel = document.getElementById('sensorSelect')?.value || 'all';
+  const list = sel === 'all' ? SENSOR_LIST : SENSOR_LIST.filter(s => s.key === sel);
+  list.forEach(s => { if (nodeDataCharts[s.key]) { try { nodeDataCharts[s.key].destroy(); } catch {} delete nodeDataCharts[s.key]; } });
+  grid.innerHTML = list.map(s => `
+    <div class="nd-chart-card">
+      <div class="nd-chart-title" style="color:${s.color};">${s.label} (${s.unit})</div>
+      <canvas id="chart_${s.key}" height="100"></canvas>
+    </div>`).join('');
+  list.forEach(s => {
+    nodeDataCharts[s.key] = new Chart(document.getElementById(`chart_${s.key}`), {
+      type: 'line',
+      data: { labels: Array.from({length:20},(_,i)=>`${i}s`), datasets: [{ label: s.label, data: Array.from({length:20},()=>+(Math.random()*(s.max-s.min)+s.min).toFixed(2)), borderColor: s.color, backgroundColor: s.color+'22', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
+      options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { y: { min: s.min, max: s.max, grid: { color: '#f1f5f9' } }, x: { display: false } } }
+    });
+  });
+}
+
+function renderSpectrumCharts() {
+  const fl = Array.from({length:50},(_,i)=>`${i*10}Hz`);
+  if (nodeDataCharts.spectrum) { try { nodeDataCharts.spectrum.destroy(); } catch {} }
+  if (nodeDataCharts.ultra) { try { nodeDataCharts.ultra.destroy(); } catch {} }
+  nodeDataCharts.spectrum = new Chart(document.getElementById('spectrumChart'), {
+    type: 'bar', data: { labels: fl, datasets: [{ data: Array.from({length:50},()=>+(Math.random()*10).toFixed(2)), backgroundColor: '#6366f1aa', borderColor: '#6366f1', borderWidth: 1 }] },
+    options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { ticks: { maxTicksLimit: 10 } } } }
+  });
+  nodeDataCharts.ultra = new Chart(document.getElementById('ultraChart'), {
+    type: 'bar', data: { labels: fl, datasets: [{ data: Array.from({length:50},()=>+(Math.random()*8).toFixed(2)), backgroundColor: '#06b6d4aa', borderColor: '#06b6d4', borderWidth: 1 }] },
+    options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { ticks: { maxTicksLimit: 10 } } } }
+  });
+}
+
+function renderRmsCards() {
+  const grid = document.getElementById('rmsGrid');
+  if (!grid) return;
+  grid.innerHTML = SENSOR_LIST.map(s => `
+    <div class="nd-rms-card" style="border-top:3px solid ${s.color};">
+      <div class="nd-rms-label">${s.label} RMS</div>
+      <div class="nd-rms-val" id="rms_${s.key}" style="color:${s.color};">--</div>
+      <div class="nd-rms-unit">${s.unit}</div>
+      <canvas id="rmsChart_${s.key}" height="60"></canvas>
+    </div>`).join('');
+  SENSOR_LIST.forEach(s => {
+    nodeDataCharts[`rms_${s.key}`] = new Chart(document.getElementById(`rmsChart_${s.key}`), {
+      type: 'line', data: { labels: Array.from({length:20},(_,i)=>`${i}`), datasets: [{ data: Array.from({length:20},()=>+(Math.random()*(s.max-s.min)*0.5+s.min).toFixed(2)), borderColor: s.color, backgroundColor: s.color+'22', tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 }] },
+      options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
+    });
+  });
+}
+
+function renderWaterCards() {
+  const grid = document.getElementById('waterGrid');
+  if (!grid) return;
+  grid.innerHTML = SENSOR_LIST.map(s => `
+    <div class="nd-water-card">
+      <div class="nd-water-label" style="color:${s.color};">${s.label}</div>
+      <div class="nd-water-wrap">
+        <div class="nd-water-tank">
+          <div class="nd-water-fill" id="wf_${s.key}" style="height:50%;background:linear-gradient(180deg,${s.color},${s.color}88);"></div>
+          <div id="wb_${s.key}" style="position:absolute;inset:0;pointer-events:none;"></div>
+        </div>
+        <div class="nd-water-scale">
+          <span>${s.max}</span><span>${(s.max*0.75).toFixed(0)}</span><span>${(s.max*0.5).toFixed(0)}</span><span>${(s.max*0.25).toFixed(0)}</span><span>0</span>
+        </div>
+      </div>
+      <div class="nd-water-val" id="wv_${s.key}" style="color:${s.color};">-- ${s.unit}</div>
+    </div>`).join('');
+}
+
+function renderPtpCards() {
+  const grid = document.getElementById('ptpGrid');
+  if (!grid) return;
+  grid.innerHTML = SENSOR_LIST.map(s => `
+    <div class="nd-ptp-card" style="border-left:4px solid ${s.color};">
+      <div style="font-size:0.8rem;font-weight:700;color:${s.color};margin-bottom:8px;">${s.label}</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Peak</div><div class="nd-ptp-val" id="ptpMax_${s.key}" style="color:${s.color};">--</div></div>
+        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Trough</div><div class="nd-ptp-val" id="ptpMin_${s.key}" style="color:#64748b;">--</div></div>
+        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">P-P</div><div class="nd-ptp-val" id="ptpPP_${s.key}" style="color:#6366f1;">--</div></div>
+        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Unit</div><div class="nd-ptp-val" style="color:#64748b;">${s.unit}</div></div>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+        <div id="ptpBar_${s.key}" style="height:100%;background:${s.color};width:50%;border-radius:3px;transition:width 0.5s;"></div>
+      </div>
+    </div>`).join('');
+  setTimeout(() => {
+    if (nodeDataCharts.ptp) { try { nodeDataCharts.ptp.destroy(); } catch {} }
+    const el = document.getElementById('ptpChart');
+    if (!el) return;
+    nodeDataCharts.ptp = new Chart(el, {
+      type: 'line',
+      data: { labels: Array.from({length:20},(_,i)=>`${i*5}min`), datasets: SENSOR_LIST.map(s => ({ label: s.label, data: Array.from({length:20},()=>+(Math.random()*s.max*0.3).toFixed(2)), borderColor: s.color, backgroundColor: 'transparent', tension: 0.4, pointRadius: 3, borderWidth: 2 })) },
+      options: { responsive: true, animation: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { color: '#f1f5f9' } } } }
+    });
+  }, 100);
+}
+
+function updateLiveData() {
+  const rand = (min, max) => +(Math.random() * (max - min) + min).toFixed(2);
+  const vals = { temp: rand(55,95), vib: rand(1,15), press: rand(1,8), rpm: Math.floor(rand(800,2800)), mag: rand(10,80), ultra: rand(20,90) };
+  allNodeData.push({ ts: Date.now(), ...vals });
+  if (allNodeData.length > 500) allNodeData.shift();
+
+  SENSOR_LIST.forEach(s => {
+    const c = nodeDataCharts[s.key];
+    if (c) { c.data.datasets[0].data.shift(); c.data.datasets[0].data.push(vals[s.key]); c.update('none'); }
+  });
+
+  const lv = document.getElementById('liveValuesGrid');
+  if (lv) {
+    lv.innerHTML = SENSOR_LIST.map(s => {
+      const pct = ((vals[s.key] - s.min) / (s.max - s.min) * 100).toFixed(1);
+      return `<div class="nd-live-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;margin-bottom:7px;">
+          <span style="font-weight:600;">${s.label}</span>
+          <strong style="color:${s.color}">${vals[s.key]} ${s.unit}</strong>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${s.color};border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  if (nodeDataCharts.spectrum) { nodeDataCharts.spectrum.data.datasets[0].data = Array.from({length:50},()=>+(Math.random()*10).toFixed(2)); nodeDataCharts.spectrum.update('none'); }
+  if (nodeDataCharts.ultra) { nodeDataCharts.ultra.data.datasets[0].data = Array.from({length:50},()=>+(Math.random()*8).toFixed(2)); nodeDataCharts.ultra.update('none'); }
+
+  SENSOR_LIST.forEach(s => {
+    const el = document.getElementById(`rms_${s.key}`);
+    if (el) el.textContent = vals[s.key];
+    const c = nodeDataCharts[`rms_${s.key}`];
+    if (c) { c.data.datasets[0].data.shift(); c.data.datasets[0].data.push(vals[s.key]); c.update('none'); }
+  });
+
+  SENSOR_LIST.forEach(s => {
+    const pct = ((vals[s.key] - s.min) / (s.max - s.min) * 100);
+    const fill = document.getElementById(`wf_${s.key}`);
+    const valEl = document.getElementById(`wv_${s.key}`);
+    const bubble = document.getElementById(`wb_${s.key}`);
+    if (fill) fill.style.height = Math.min(95, Math.max(5, pct)) + '%';
+    if (valEl) valEl.textContent = `${vals[s.key]} ${s.unit}`;
+    if (bubble) bubble.innerHTML = Array.from({length:3},()=>`<div style="position:absolute;bottom:0;left:${Math.random()*80+10}%;width:${Math.random()*8+4}px;height:${Math.random()*8+4}px;border-radius:50%;background:rgba(255,255,255,0.5);animation:rise ${Math.random()*2+1}s linear infinite;"></div>`).join('');
+  });
+
+  const recent = allNodeData.slice(-20);
+  SENSOR_LIST.forEach(s => {
+    const arr = recent.map(d => d[s.key]);
+    if (!arr.length) return;
+    const maxV = Math.max(...arr), minV = Math.min(...arr), pp = +(maxV - minV).toFixed(2);
+    const pct = (pp / s.max * 100).toFixed(1);
+    const maxEl = document.getElementById(`ptpMax_${s.key}`);
+    const minEl = document.getElementById(`ptpMin_${s.key}`);
+    const ppEl = document.getElementById(`ptpPP_${s.key}`);
+    const barEl = document.getElementById(`ptpBar_${s.key}`);
+    if (maxEl) maxEl.textContent = maxV.toFixed(2);
+    if (minEl) minEl.textContent = minV.toFixed(2);
+    if (ppEl) ppEl.textContent = pp;
+    if (barEl) barEl.style.width = Math.min(100, pct) + '%';
+  });
+
+  if (nodeDataCharts.ptp) {
+    nodeDataCharts.ptp.data.datasets.forEach((ds, i) => {
+      const s = SENSOR_LIST[i];
+      const arr = recent.map(d => d[s.key]);
+      if (!arr.length) return;
+      const pp = +(Math.max(...arr) - Math.min(...arr)).toFixed(2);
+      ds.data.shift(); ds.data.push(pp);
+    });
+    nodeDataCharts.ptp.update('none');
+  }
+}
+
+function downloadNodeData() {
+  const year = document.getElementById('dlYear').value;
+  const month = document.getElementById('dlMonth').value;
+  const sensor = document.getElementById('dlSensor').value;
+  const format = document.getElementById('dlFormat').value;
+  const node = currentNodeForData;
+  const list = sensor === 'all' ? SENSOR_LIST : SENSOR_LIST.filter(s => s.key === sensor);
+  const data = allNodeData.length > 0 ? allNodeData : Array.from({length:10},(_,i) => ({ ts: Date.now()-i*60000, ...Object.fromEntries(SENSOR_LIST.map(s=>[s.key,+(Math.random()*(s.max-s.min)+s.min).toFixed(2)])) }));
+
+  if (format === 'csv') {
+    const headers = ['Timestamp', ...list.map(s=>`${s.label}(${s.unit})`)];
+    const rows = data.map(d => [new Date(d.ts).toISOString(), ...list.map(s=>d[s.key])]);
+    const csv = [headers, ...rows].map(r=>r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = `${node.serial_no}_${year}_${String(month).padStart(2,'0')}_${sensor}.csv`;
+    a.click();
+  } else {
+    const json = JSON.stringify({node:node.serial_no,model:node.model,year,month,sensor,data},null,2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    a.download = `${node.serial_no}_${year}_${String(month).padStart(2,'0')}_${sensor}.json`;
+    a.click();
+  }
+  toast(`✅ Downloaded: ${node.serial_no} ${year}-${String(month).padStart(2,'0')}`, 'success');
+}
+
 
 function closeNodeData() {
   if (nodeDataInterval) clearInterval(nodeDataInterval);
