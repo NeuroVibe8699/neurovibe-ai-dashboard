@@ -204,4 +204,61 @@ td{padding:11px 14px;vertical-align:middle;}
 .gw-node-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.2s;font-size:0.82rem;}
 .gw-node-item:hover{background:#f5f3ff;border-color:var(--accent);}
 #mapCanvas.drag-over{background-color:#f0f4ff;border:2px dashed var(--accent);}
+/* DATA TABS */
+.data-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.data-tab{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.2s;color:var(--muted);}
+.data-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.data-tab-content{display:none;}
+.data-tab-content.active{display:block;}
+.time-config{display:flex;align-items:center;gap:10px;background:#f8fafc;padding:10px 14px;border-radius:8px;margin-bottom:14px;flex-wrap:wrap;border:1px solid var(--border);}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.data-charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.data-chart-card{background:#f8fafc;border-radius:10px;padding:14px;border:1px solid var(--border);}
+.data-chart-title{font-size:0.8rem;font-weight:700;margin-bottom:10px;color:var(--text);}
+.live-values-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+.live-val-card{background:#f8fafc;border-radius:8px;padding:12px;border:1px solid var(--border);}
+.live-val-header{display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;margin-bottom:8px;}
+.live-progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.live-progress-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+
+/* RMS */
+.rms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+.rms-card{background:#f8fafc;border-radius:10px;padding:16px;border:1px solid var(--border);text-align:center;}
+.rms-label{font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.rms-value{font-size:2rem;font-weight:800;color:var(--text);line-height:1;}
+.rms-unit{font-size:0.72rem;color:var(--muted);margin-bottom:10px;}
+
+/* WATER GRAPHIC */
+.water-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;}
+.water-card{text-align:center;}
+.water-label{font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:10px;}
+.water-tank-wrap{display:flex;gap:6px;justify-content:center;align-items:flex-end;}
+.water-tank{width:60px;height:180px;border:3px solid var(--border);border-radius:8px;position:relative;overflow:hidden;background:#f1f5f9;}
+.water-fill{position:absolute;bottom:0;left:0;right:0;transition:height 0.8s ease;border-radius:0 0 5px 5px;}
+.water-bubbles{position:absolute;bottom:0;left:0;right:0;height:100%;pointer-events:none;}
+.bubble{position:absolute;bottom:0;border-radius:50%;background:rgba(255,255,255,0.5);animation:rise linear infinite;}
+@keyframes rise{0%{bottom:0;opacity:0.8;}100%{bottom:100%;opacity:0;}}
+.water-scale{display:flex;flex-direction:column;justify-content:space-between;height:180px;font-size:0.6rem;color:var(--muted);padding:2px 0;}
+.water-value{font-size:0.85rem;font-weight:700;color:var(--text);margin-top:8px;}
+
+/* PIN ACTIONS */
+.pin-actions{display:none;gap:3px;margin-top:4px;justify-content:center;flex-wrap:wrap;}
+.map-pin:hover .pin-actions{display:flex;}
+.pin-btn{font-size:0.65rem;padding:2px 5px;border-radius:4px;cursor:pointer;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.15);transition:all 0.2s;border:none;}
+.pin-btn:hover{transform:scale(1.1);}
+.config-btn{background:#6366f1;color:#fff;}
+.move-btn{background:#f59e0b;color:#fff;}
+.data-btn{background:#10b981;color:#fff;}
+.gw-btn{background:#06b6d4;color:#fff;}
+.del-btn{background:#ef4444;color:#fff;}
+
+/* GATEWAY POPUP */
+.gw-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,0.25);z-index:300;width:480px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--border);}
+.gw-popup-header{padding:16px 20px;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;display:flex;align-items:center;justify-content:space-between;}
+.gw-popup-header h4{font-size:0.95rem;font-weight:700;}
+.gw-popup-header button{background:rgba(255,255,255,0.1);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;}
+.gw-popup-body{padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.gw-node-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.2s;font-size:0.82rem;}
+.gw-node-item:hover{background:#f5f3ff;border-color:var(--accent);}
 
