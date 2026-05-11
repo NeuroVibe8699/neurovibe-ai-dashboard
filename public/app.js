@@ -1,4 +1,39 @@
 const API = '';
+// Standard Node Icon SVG
+const NODE_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="20" height="20" rx="4" fill="#6366f1"/>
+  <rect x="6" y="6" width="4" height="6" rx="1" fill="white"/>
+  <rect x="14" y="6" width="4" height="6" rx="1" fill="white"/>
+  <rect x="6" y="15" width="12" height="3" rx="1" fill="white"/>
+  <rect x="9" y="18" width="2" height="4" fill="#6366f1"/>
+  <rect x="13" y="18" width="2" height="4" fill="#6366f1"/>
+</svg>`;
+
+// Sensor List
+const SENSOR_LIST = [
+  { key:'temp',  label:'Temperature',   unit:'°C',   color:'#ef4444', min:0,   max:100  },
+  { key:'vib',   label:'Vibration',     unit:'mm/s', color:'#6366f1', min:0,   max:20   },
+  { key:'press', label:'Pressure',      unit:'bar',  color:'#10b981', min:0,   max:10   },
+  { key:'rpm',   label:'RPM',           unit:'RPM',  color:'#f59e0b', min:0,   max:3000 },
+  { key:'mag',   label:'Magnetic Flux', unit:'mT',   color:'#8b5cf6', min:0,   max:100  },
+  { key:'ultra', label:'Ultrasound',    unit:'dB',   color:'#06b6d4', min:0,   max:100  },
+];
+
+// Interval Options
+const INTERVAL_OPTIONS = [
+  { label:'5 Minutes',  ms:300000   },
+  { label:'15 Minutes', ms:900000   },
+  { label:'30 Minutes', ms:1800000  },
+  { label:'1 Hour',     ms:3600000  },
+  { label:'2 Hours',    ms:7200000  },
+  { label:'4 Hours',    ms:14400000 },
+  { label:'8 Hours',    ms:28800000 },
+  { label:'12 Hours',   ms:43200000 },
+  { label:'24 Hours',   ms:86400000 },
+];
+
+let nodeDataCharts = {}, nodeDataInterval = null, currentNodeForData = null, allNodeData = [];
+
 let token = localStorage.getItem('nv_token');
 let currentUser = JSON.parse(localStorage.getItem('nv_user') || 'null');
 let gateways = [], nodes = [], sites = [], currentSite = null, addingPin = null, movingPinId = null;
