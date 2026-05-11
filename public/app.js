@@ -221,12 +221,17 @@ async function deleteGateway(id) {
 
 // ===== NODES =====
 function renderNodes() {
-  const gwOpts = gateways.map(g => `<option value="${g.id}">${g.model} - ${g.serial_no}</option>`).join('');
+  const gwOpts = gateways.map(g=>`<option value="${g.id}">${g.model} - ${g.serial_no}</option>`).join('');
   document.getElementById('nodeGateway').innerHTML = '<option value="">None</option>' + gwOpts;
   document.getElementById('nodeBody').innerHTML = nodes.length === 0
     ? '<tr><td colspan="10" style="text-align:center;padding:40px;color:#64748b;">No nodes yet.</td></tr>'
     : nodes.map(n => `<tr>
-        <td><span class="badge badge-purple">${n.model}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="node-hw-icon">${NODE_ICON_SVG}</span>
+            <span class="badge badge-purple">${n.model}</span>
+          </div>
+        </td>
         <td class="mono">${n.serial_no}</td>
         <td class="mono">${n.radio_mac||'-'}</td>
         <td class="mono">${n.ble_mac||'-'}</td>
@@ -235,14 +240,13 @@ function renderNodes() {
         <td>${n.gateway_model?`<span class="badge badge-blue">${n.gateway_model}</span>`:'-'}</td>
         <td>${n.site||'-'}</td>
         <td><span class="badge ${n.status==='active'?'badge-green':'badge-red'}">${n.status||'active'}</span></td>
-        <td style="display:flex;gap:6px;">
+        <td style="display:flex;gap:6px;align-items:center;">
           <button class="btn btn-sm btn-outline" onclick="openCongregation(${n.id})">⚙️ Config</button>
           <button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="openNodeData(${n.id})">📊 Data</button>
           <button class="btn-icon" onclick="deleteNode(${n.id})">🗑️</button>
         </td>
       </tr>`).join('');
 }
-
 async function submitNode(e) {
   e.preventDefault();
   const body = { model: document.getElementById('nodeModel').value, serial_no: document.getElementById('nodeSerial').value, radio_mac: document.getElementById('nodeRadioMAC').value, ble_mac: document.getElementById('nodeBLEMAC').value, frequency: document.getElementById('nodeFreq').value, is_ai: document.getElementById('nodeAI').value === 'true', gateway_id: document.getElementById('nodeGateway').value || null, site: document.getElementById('nodeSite').value };
