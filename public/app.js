@@ -1081,14 +1081,48 @@ async function importCSV(type,input) {
 }
 
 function exportCSV(type) {
-  let headers,rows;
-  if(type==='gateways'){headers=['Model','Serial No','IMEI','Radio MAC','LAN MAC','WAN MAC','BLE MAC','Frequency','Site'];rows=gateways.map(g=>[g.model,g.serial_no,g.imei,g.radio_mac,g.lan_mac,g.wan_mac,g.ble_mac,g.frequency,g.site]);}
-  else{headers=['Model','Serial No','Radio MAC','BLE MAC','Frequency','AI Model','Site'];rows=nodes.map(n=>[n.model,n.serial_no,n.radio_mac,n.ble_mac,n.frequency,n.is_ai?'Yes':'No',n.site]);}
-  const csv=[headers,...rows].map(r=>r.map(c=>`"${c||''}"`).join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`neurovibe_${type}_${Date.now()}.csv`;
-  a.click(); toast(`${type} exported!`,'success');
+  // Explicit security block: Reject non-admin access immediately
+  if (!currentUser || currentUser.role !== 'admin') {
+    alert("Unauthorized Action: Only administrators can export inventory data.");
+    console.warn(`Blocked unauthorized CSV export attempt for: ${type}`);
+    return;
+  }
+
+  // Target collection choice based on parameters
+  const targetData = (type === 'gateways') ? gateways : nodes;
+  
+  if (!targetData || targetData.length === 0) {
+    alert(`No data available to export for ${type}.`);
+    return;
+  }
+
+  // Extract CSV Keys (headers) dynamically from the first object
+  const headers = Object.keys(targetData[0]);
+  const csvRows = [];
+  
+  // Append headers line
+  csvRows.push(headers.join(','));
+
+  // Map entries formatting and handling inner array/object boundaries safely
+  for (const row of targetData) {
+    const values = headers.map(header => {
+      const escaped = ('' + (row[header] || '')).replace(/"/g, '""');
+      return `"${escaped}"`;
+    });
+    csvRows.push(values.join(','));
+  }
+
+  // Generate downloadable Blob package payload
+  const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `neurovibe_${type}_export_${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  
+  link.click();
+  document.body.removeChild(link);
 }
 
 function filterTable(tableId,query) {
