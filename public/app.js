@@ -98,16 +98,27 @@ async function loadAll() {
 function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  
   const pg = document.getElementById(`page-${page}`);
   if (pg) pg.classList.add('active');
+  
   const nv = document.querySelector(`[data-page="${page}"]`);
   if (nv) nv.classList.add('active');
+  
   if (page === 'dashboard') renderDashboard();
   if (page === 'gateways') renderGateways();
   if (page === 'nodes') renderNodes();
-  if (page === 'sites') renderSites();
+  if (page === 'sites') {
+    renderSites();
+    // Only show the map editing tools if the logged-in user is an admin
+    const mapToolbar = document.getElementById('mapToolbar');
+    if (mapToolbar) {
+      mapToolbar.style.display = (currentUser.role === 'admin') ? 'flex' : 'none';
+    }
+  }
   if (page === 'users') loadUsers();
 }
+
 
 // ===== DASHBOARD =====
 async function renderDashboard() {
