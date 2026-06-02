@@ -1,211 +1,360 @@
-const API = '';
-let token = localStorage.getItem('nv_token');
-let currentUser = JSON.parse(localStorage.getItem('nv_user') || 'null');
-let gateways = [], nodes = [], sites = [], currentSite = null, addingPin = null, movingPinId = null;
-let sensorChart, deviceChart, tempChart, freqChart;
-let nodeDataCharts = {}, nodeDataInterval = null, currentNodeForData = null, allNodeData = [];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroVibe AI - Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
 
-// Cleaned up tracking elements
-const SENSOR_LIST = [
-  { key:'temp',  label:'Temperature',   unit:'°C',   color:'#ef4444', min:0, max:100  },
-  { key:'vib',   label:'Vibration',     unit:'mm/s', color:'#6366f1', min:0, max:20   },
-  { key:'press', label:'Pressure',      unit:'bar',  color:'#10b981', min:0, max:10   },
-  { key:'rpm',   label:'RPM',           unit:'RPM',  color:'#f59e0b', min:0, max:3000 },
-  { key:'mag',   label:'Magnetic Flux', unit:'mT',   color:'#8b5cf6', min:0, max:100  },
-  { key:'ultra', label:'Ultrasound',    unit:'dB',   color:'#06b6d4', min:0, max:100  },
-];
+<!-- LOGIN PAGE -->
+<div id="loginPage" class="login-page">
+  <div class="login-bg">
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+  <div class="sidebar-logo">
+  <div class="logo-sm">⚡</div>
+  <div>
+    <h2>NeuroVibe AI Technologies</h2>
+    <span>Pvt. Ltd. — IoT ML AI PdM Platform</span>
+  </div>
+  </div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="loginEmail" placeholder="admin@neurovibe.ai" required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" required />
+      </div>
+      <div id="loginError" class="error-msg" style="display:none"></div>
+      <button type="submit" class="btn btn-primary btn-full">Sign In →</button>
+    </form>
+    <p class="login-hint">Default: admin@neurovibe.ai / admin@123</p>
+  </div>
+</div>
 
-const INTERVAL_OPTIONS = [
-  { label:'5 Minutes',  ms:300000   },
-  { label:'15 Minutes', ms:900000   },
-  { label:'30 Minutes', ms:1800000  },
-  { label:'1 Hour',     ms:3600000  },
-  { label:'2 Hours',    ms:7200000  },
-  { label:'4 Hours',    ms:14400000 },
-  { label:'8 Hours',    ms:28800000 },
-  { label:'12 Hours',   ms:43200000 },
-  { label:'24 Hours',   ms:86400000 },
-];
+<!-- APP -->
+<div id="appPage" class="app" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+  <div class="logo-sm">⚡</div>
+  <div><h2>NeuroVibe AI Technologies</h2><span>Pvt. Ltd. — IoT Platform</span></div>
+</div>
+  <nav class="sidebar-nav">
+      <div class="nav-section">OVERVIEW</div>
+      <div class="nav-item active" data-page="dashboard"><span>📊</span> Dashboard</div>
+      <div class="nav-section">INVENTORY</div>
+      <div class="nav-item" data-page="gateways"><span>📡</span> Gateways</div>
+      <div class="nav-item" data-page="nodes"><span>🔌</span> Nodes</div>
+      <div class="nav-section">MANAGEMENT</div>
+      <div class="nav-item" data-page="sites"><span>🗺️</span> Site Mapping</div>
+      <div class="nav-item" data-page="users"><span>👥</span> Users</div>
+      <div class="nav-section">TOOLS</div>
+      <div class="nav-item" data-page="import"><span>📦</span> Import / Export</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div>
+          <div class="user-name" id="sideUserName">Admin</div>
+          <div class="user-role" id="sideUserRole">admin</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">⏻</button>
+    </div>
+  </aside>
 
-// ===== AUTH =====
-document.getElementById('loginForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  try {
-    const res = await fetch(`${API}/api/auth/login`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    token = data.token; currentUser = data.user;
-    localStorage.setItem('nv_token', token);
-    localStorage.setItem('nv_user', JSON.stringify(currentUser));
-    showApp();
-  } catch (err) {
-    const el = document.getElementById('loginError');
-    if (el) { el.textContent = err.message; el.style.display = 'block'; }
-  }
-});
+  <main class="main">
 
-function logout() {
-  localStorage.removeItem('nv_token'); localStorage.removeItem('nv_user');
-  token = null; currentUser = null;
-  document.getElementById('appPage').style.display = 'none';
-  document.getElementById('loginPage').style.display = 'flex';
-}
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="topbar">
+        <h1>📊 Dashboard</h1>
+        <span class="topbar-time" id="dashTime"></span>
+      </div>
+      <div class="content">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-title">📈 Live Sensor Readings</div><canvas id="sensorChart"></canvas></div>
+          <div class="chart-card"><div class="chart-title">🔌 Device Distribution</div><canvas id="deviceChart"></canvas></div>
+          <div class="chart-card"><div class="chart-title">🌡️ Temperature Trend</div><canvas id="tempChart"></canvas></div>
+          <div class="chart-card"><div class="chart-title">📡 Gateway Frequency Split</div><canvas id="freqChart"></canvas></div>
+        </div>
+      </div>
+    </div>
 
-async function showApp() {
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('appPage').style.display = 'flex';
-  
-  if (!currentUser && localStorage.getItem('nv_user')) {
-    currentUser = JSON.parse(localStorage.getItem('nv_user'));
-  }
+    <!-- GATEWAYS -->
+    <div id="page-gateways" class="page">
+      <div class="topbar">
+        <h1>📡 Gateways</h1>
+        <button class="btn btn-primary admin-only-btn" onclick="openModal('gwModal')" style="display:none">+ Add Gateway</button>
+      </div>
+      <div class="content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('gwTable',this.value)" />
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')" style="display:none">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table id="gwTable">
+              <thead><tr><th>Model</th><th>Serial No</th><th>IMEI</th><th>Radio MAC</th><th>LAN MAC</th><th>WAN MAC</th><th>BLE MAC</th><th>Freq</th><th>Site</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="gwBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  // Fixing avatar crash safety check
-  const firstLetter = currentUser && currentUser.name ? currentUser.name[0].toUpperCase() : 'A';
-  document.getElementById('userAvatar').textContent = firstLetter;
-  document.getElementById('sideUserName').textContent = currentUser ? currentUser.name : 'Admin';
-  document.getElementById('sideUserRole').textContent = currentUser ? currentUser.role : 'user';
+    <!-- NODES -->
+    <div id="page-nodes" class="page">
+      <div class="topbar">
+        <h1>🔌 Nodes</h1>
+        <button class="btn btn-primary admin-only-btn" onclick="openModal('nodeModal')" style="display:none">+ Add Node</button>
+      </div>
+      <div class="content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('nodeTable',this.value)" />
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('nodes')" style="display:none">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table id="nodeTable">
+              <thead><tr><th>Model</th><th>Serial No</th><th>Radio MAC</th><th>BLE MAC</th><th>Freq</th><th>Type</th><th>Gateway</th><th>Site</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="nodeBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  const userRole = String(currentUser ? currentUser.role : 'user').trim().toLowerCase();
+    <!-- SITES -->
+    <div id="page-sites" class="page">
+      <div class="topbar">
+        <h1>🗺️ Site Mapping</h1>
+        <button class="btn btn-primary admin-only-btn" onclick="openModal('siteModal')" style="display:none">+ Add Site</button>
+      </div>
+      <div class="content">
+        <div class="sites-layout">
+          <div class="sites-list" id="sitesList"></div>
+          <div class="map-container">
+            <div class="map-header">
+              <h3 id="mapTitle">Select a site</h3>
+              <div class="map-legend">
+                <span><span class="dot gw"></span> Gateway</span>
+                <span><span class="dot nd"></span> Node</span>
+              </div>
+            </div>
+            <div class="map-canvas" id="mapCanvas">
+              <div class="map-empty" id="mapEmpty">🗺️<br>Select a site to view map</div>
+            </div>
+            <div class="map-toolbar" id="mapToolbar" style="display:none">
+              <button class="btn btn-sm btn-outline" onclick="addPin('gateway')">📡 Add Gateway Pin</button>
+              <button class="btn btn-sm btn-outline" onclick="addPin('node')">🔌 Add Node Pin</button>
+              <button class="btn btn-sm btn-primary" onclick="saveMap()">💾 Save Map</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  if (userRole === 'admin') {
-    document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'inline-flex', 'important'));
-    document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'flex', 'important'));
-  } else {
-    document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
-    document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'none', 'important'));
-  }
+    <!-- USERS -->
+    <div id="page-users" class="page">
+      <div class="topbar">
+        <h1>👥 Users</h1>
+        <button class="btn btn-primary" onclick="openModal('userModal')">+ Add User</button>
+      </div>
+      <div class="content">
+        <div class="table-card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Action</th></tr></thead>
+              <tbody id="userBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.replaceWith(el.cloneNode(true));
-  });
+    <!-- IMPORT/EXPORT -->
+    <div id="page-import" class="page">
+      <div class="topbar"><h1>📦 Import / Export</h1></div>
+      <div class="content">
+        <div class="import-grid">
+          <div class="import-card">
+            <h3>📡 Gateway Import</h3>
+            <p class="import-desc">Columns: Model, Serial No, IMEI, Radio MAC, LAN MAC, WAN MAC, BLE MAC, Frequency</p>
+            <label class="drop-zone" for="gwFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
+            <input type="file" id="gwFile" accept=".csv" style="display:none" onchange="importCSV('gateways',this)" />
+            <button class="btn btn-success" onclick="exportCSV('gateways')">⬇ Export Gateways CSV</button>
+          </div>
+          <div class="import-card">
+            <h3>🔌 Node Import</h3>
+            <p class="import-desc">Columns: Model, Serial No, Radio MAC, BLE MAC, Frequency, AI Model</p>
+            <label class="drop-zone" for="nodeFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
+            <input type="file" id="nodeFile" accept=".csv" style="display:none" onchange="importCSV('nodes',this)" />
+            <button class="btn btn-success" onclick="exportCSV('nodes')">⬇ Export Nodes CSV</button>
+          </div>
+        </div>
+        <div class="table-card" style="margin-top:20px">
+          <div class="table-header"><h3>📋 CSV Format Reference</h3></div>
+          <div class="format-grid">
+            <div>
+              <p class="format-title">Gateway CSV</p>
+              <pre class="format-pre">Model,Serial No,IMEI,Radio MAC,LAN MAC,WAN MAC,BLE MAC,Frequency
+NV1001,NV-GW-000001,352099001761481,A1:B2:C3:D4:E5:F6,A1:B2:C3:D4:E5:F7,A1:B2:C3:D4:E5:F8,A1:B2:C3:D4:E5:F9,868MHz</pre>
+            </div>
+            <div>
+              <p class="format-title">Node CSV</p>
+              <pre class="format-pre">Model,Serial No,Radio MAC,BLE MAC,Frequency,AI Model
+NVS1001,NV-ND-000001,C1:D2:E3:F4:A5:B6,C1:D2:E3:F4:A5:B7,868MHz,No</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => showPage(el.dataset.page));
-  });
+    <!-- CONGREGATION -->
+    <div id="page-congregation" class="page">
+      <div class="topbar">
+        <h1>⚙️ Congregation — <span id="congTitle"></span></h1>
+        <button class="btn btn-outline" onclick="showPage('nodes')">← Back</button>
+      </div>
+      <div class="content">
+        <div id="congNodeInfo" class="node-info-card"></div>
+        <div class="recipe-card">
+          <div class="recipe-header">
+            <div><h3>⚙️ Motor Assignment Matrix</h3><p>Configure motors assigned to this node</p></div>
+            <button class="btn btn-primary" onclick="addMotor()">+ Add Motor</button>
+          </div>
+          <div class="motor-grid" id="motorGrid"></div>
+        </div>
+      </div>
+    </div>
 
-  await loadAll();
-  showPage('dashboard');
-  setInterval(updateClock, 1000); updateClock();
-  setInterval(updateCharts, 3000);
-}
+  </main>
+</div>
 
-function updateClock() {
-  const el = document.getElementById('dashTime');
-  if (el) el.textContent = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
-}
+<!-- GATEWAY MODAL -->
+<div id="gwModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Add Gateway</h3><button class="modal-close" onclick="closeModal('gwModal')">✕</button></div>
+    <form onsubmit="submitGateway(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Model *</label>
+            <select id="gwModel" required>
+              <option value="">Select</option>
+              <option>NV1001</option><option>NV1002</option><option>NV1003</option><option>NV1004</option>
+              <option>NV1005</option><option>NV1006</option><option>NV1007</option><option>NV1008</option>
+              <option>NV1009</option><option>NV1010</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Serial No *</label><input id="gwSerial" placeholder="NV-GW-000001" required /></div>
+          <div class="form-group"><label>IMEI</label><input id="gwIMEI" placeholder="352099001761481" /></div>
+          <div class="form-group"><label>Frequency</label>
+            <select id="gwFreq"><option value="868MHz">868MHz</option><option value="915MHz">915MHz</option></select>
+          </div>
+          <div class="form-group"><label>Radio MAC</label><input id="gwRadioMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group"><label>LAN MAC</label><input id="gwLANMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group"><label>WAN MAC</label><input id="gwWANMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group"><label>BLE MAC</label><input id="gwBLEMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group full"><label>Site</label><input id="gwSite" placeholder="Plant A" /></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('gwModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Gateway</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-if (token && currentUser) showApp();
+<!-- NODE MODAL -->
+<div id="nodeModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Add Node</h3><button class="modal-close" onclick="closeModal('nodeModal')">✕</button></div>
+    <form onsubmit="submitNode(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Model *</label>
+            <select id="nodeModel" required>
+              <option value="">Select</option>
+              <option>NVS1001</option><option>NVS1002</option><option>NVS1003</option><option>NVS1004</option>
+              <option>NVS1005</option><option>NVS1006</option><option>NVS1007</option><option>NVS1008</option>
+              <option>NVS1009</option><option>NVS1010</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Serial No *</label><input id="nodeSerial" placeholder="NV-ND-000001" required /></div>
+          <div class="form-group"><label>Frequency</label>
+            <select id="nodeFreq"><option value="868MHz">868MHz</option><option value="915MHz">915MHz</option></select>
+          </div>
+          <div class="form-group"><label>AI Model?</label>
+            <select id="nodeAI"><option value="false">No</option><option value="true">Yes (NVS1003/NVS1004)</option></select>
+          </div>
+          <div class="form-group"><label>Radio MAC</label><input id="nodeRadioMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group"><label>BLE MAC</label><input id="nodeBLEMAC" placeholder="AA:BB:CC:DD:EE:FF" /></div>
+          <div class="form-group"><label>Gateway</label><select id="nodeGateway"><option value="">None</option></select></div>
+          <div class="form-group"><label>Site</label><input id="nodeSite" placeholder="Plant A" /></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('nodeModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Node</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-async function api(url, method = 'GET', body = null) {
-  const opts = { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API}${url}`, opts);
-  if (res.status === 401) { logout(); return null; }
-  return res.json();
-}
+<!-- USER MODAL -->
+<div id="userModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Add User</h3><button class="modal-close" onclick="closeModal('userModal')">✕</button></div>
+    <form onsubmit="submitUser(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Name *</label><input id="uName" placeholder="John Doe" required /></div>
+          <div class="form-group"><label>Email *</label><input type="email" id="uEmail" placeholder="john@neurovibe.ai" required /></div>
+          <div class="form-group"><label>Password *</label><input type="password" id="uPassword" placeholder="••••••••" required /></div>
+          <div class="form-group"><label>Role</label>
+            <select id="uRole"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('userModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add User</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-async function loadAll() {
-  // Graceful fallback arrays if your API endpoints don't return data objects yet
-  try {
-    [gateways, nodes, sites] = await Promise.all([api('/api/gateways'), api('/api/nodes'), api('/api/sites')]);
-  } catch(e) {
-    console.warn("API collections endpoints not running yet. Using empty arrays.");
-  }
-  gateways = gateways || []; nodes = nodes || []; sites = sites || [];
-}
+<!-- SITE MODAL -->
+<div id="siteModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Add Site</h3><button class="modal-close" onclick="closeModal('siteModal')">✕</button></div>
+    <form onsubmit="submitSite(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Site Name *</label><input id="siteName" placeholder="Plant A" required /></div>
+          <div class="form-group"><label>Location</label><input id="siteLocation" placeholder="Mumbai, India" /></div>
+          <div class="form-group full"><label>Description</label><textarea id="siteDesc" placeholder="Site description..."></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('siteModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Site</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-function showPage(page) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  
-  const pg = document.getElementById(`page-${page}`);
-  if (pg) pg.classList.add('active');
-  
-  const nv = document.querySelector(`[data-page="${page}"]`);
-  if (nv) nv.classList.add('active');
-  
-  if (page === 'dashboard') renderDashboard();
-  if (page === 'gateways') renderGateways();
-  if (page === 'nodes') renderNodes();
-  if (page === 'sites') {
-    renderSites();
-    const mapToolbar = document.getElementById('mapToolbar');
-    if (mapToolbar) {
-      const userRole = String(currentUser ? currentUser.role : 'user').trim().toLowerCase();
-      mapToolbar.style.display = (userRole === 'admin') ? 'flex' : 'none';
-    }
-  }
-  if (page === 'users') loadUsers();
-}
-
-// ===== DASHBOARD =====
-async function renderDashboard() {
-  let stats = {};
-  try { stats = await api('/api/dashboard/stats') || {}; } catch(e) {}
-  
-  const cards = [
-    { icon:'📡', label:'Gateways',    value:stats.gateways||0,  sub:'Total registered',    g:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
-    { icon:'',   label:'Nodes',       value:stats.nodes||0,     sub:`${stats.ai_nodes||0} AI-enabled`, g:'linear-gradient(90deg,#10b981,#059669)' },
-    { icon:'🗺️', label:'Sites',       value:stats.sites||0,     sub:'Plant locations',      g:'linear-gradient(90deg,#f59e0b,#d97706)' },
-    { icon:'👥', label:'Users',       value:stats.users||0,     sub:'Platform users',       g:'linear-gradient(90deg,#06b6d4,#0891b2)' },
-    { icon:'🤖', label:'AI Nodes',    value:stats.ai_nodes||0,  sub:'AI-enabled devices',   g:'linear-gradient(90deg,#8b5cf6,#6d28d9)' },
-    { icon:'⚙️', label:'Motors',      value:stats.motors||0,    sub:'Assigned motors',      g:'linear-gradient(90deg,#ef4444,#dc2626)' },
-  ];
-  const statsGrid = document.getElementById('statsGrid');
-  if (statsGrid) {
-    statsGrid.innerHTML = cards.map(c => `
-      <div class="stat-card" style="--g:${c.g}">
-        <div class="stat-label">${c.icon} ${c.label}</div>
-        <div class="stat-value">${c.value}</div>
-        <div class="stat-sub">${c.sub}</div>
-      </div>`).join('');
-  }
-  initCharts();
-}
-
-function initCharts() {
-  const labels = ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'];
-  const rand = (min,max,n=8) => Array.from({length:n},()=>+(Math.random()*(max-min)+min).toFixed(1));
-  
-  const sensorCtx = document.getElementById('sensorChart');
-  if (sensorCtx) {
-    if (sensorChart) sensorChart.destroy();
-    sensorChart = new Chart(sensorCtx, {
-      type:'line', data:{labels, datasets:[
-        {label:'Temperature (°C)', data:rand(60,95), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', tension:0.4, fill:true, pointRadius:3},
-        {label:'Vibration (mm/s)', data:rand(2,12),  borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.08)', tension:0.4, fill:true, pointRadius:3},
-        {label:'Pressure (bar)',   data:rand(1,8),   borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', tension:0.4, fill:true, pointRadius:3},
-        {label:'RPM (×100)',       data:rand(10,20), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.08)', tension:0.4, fill:true, pointRadius:3},
-      ]},
-      options:{responsive:true, plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}, scales:{y:{beginAtZero:false,grid:{color:'#f1f5f9'}},x:{grid:{color:'#f1f5f9'}}}}
-    });
-  }
-
-  const deviceCtx = document.getElementById('deviceChart');
-  if (deviceCtx) {
-    if (deviceChart) deviceChart.destroy();
-    deviceChart = new Chart(deviceCtx, {
-      type:'doughnut', data:{labels:['Gateways','Standard Nodes','AI Nodes'], datasets:[{data:[gateways.length||1, nodes.filter(n=>!n.is_ai).length||1, nodes.filter(n=>n.is_ai).length||1], backgroundColor:['#6366f1','#10b981','#8b5cf6'], borderWidth:0, hoverOffset:8}]},
-      options:{responsive:true, plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}, cutout:'68%'}
-    });
-  }
-
-  const tempCtx = document.getElementById('tempChart');
-  if (tempCtx) {
-    if (tempChart) tempChart.destroy();
-    tempChart = new Chart(tempCtx, {
-      type:'bar', data:{labels:['NVS1001','NVS1002','NVS1003','NVS1004','NVS1005'], datasets:[{label:'Avg Temp (°C)', data:rand(40,85,5), backgroundColor:'#ef4444'}]},
-      options:{responsive:true, plugins:{legend:{position:'bottom'}}}
-    });
-  }
-
-  const freqCtx = document.getElementById('freqChart');
-  if (freqCtx) {
-    if (freqChart) freqChart.destroy();
-    freqChart = new Chart(freqCtx, {
-      type:'line', data:{labels:['10Hz','20Hz','50Hz','100Hz','200Hz','500Hz'], datasets:[{label:'Spectral Amplitude', data:rand(0.1,2.5,6), borderColor:'#8b5cf6', tension:0.1}]},
+<div class="toast-container" id="toastContainer"></div>
+<script src="app.js"></script>
+</body>
+</html>
