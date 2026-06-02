@@ -11,41 +11,61 @@
 
 <!-- LOGIN PAGE -->
 <div id="loginPage" class="login-page">
-  <div class="login-bg">
-    <div class="orb orb1"></div>
-    <div class="orb orb2"></div>
-    <div class="orb orb3"></div>
-  </div>
-  
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="neurovibe-vector-logo login-logo-size">
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
-          <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="white" stroke-width="4" stroke-linejoin="round"/>
-          <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="white"/>
-          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#ff9933" opacity="0.15"/>
-        </svg>
-      </div>
-      <h2><span class="text-saffron">NEUROVIBE</span> <span class="text-premium-dark">AI TECHNOLOGIES</span></h2>
-      <span>Pvt. Ltd. — IoT ML AI PdM Platform</span>
-    </div>
+  <div class="split-login-container">
     
-    <form id="loginForm">
-      <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" id="loginEmail" placeholder="admin@neurovibe.ai" required />
-      </div>
-      <div class="form-group">
-        <div class="password-label-container">
-          <label>Password</label>
-          <a href="#" onclick="openForgotPasswordModal(event)" class="forgot-link">Forgot Password?</a>
+    <!-- LEFT SIDE: MARKETING & BRAND IMAGE -->
+    <div class="login-left-panel">
+      <div class="brand-header">
+        <div class="neurovibe-vector-logo left-logo-size">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
+            <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="#ff9933" stroke-width="4" stroke-linejoin="round"/>
+            <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="#ff9933"/>
+          </svg>
         </div>
-        <input type="password" id="loginPassword" placeholder="••••••••" required />
+        <div class="brand-header-text">
+          <h3><span class="text-saffron">NEUROVIBE</span> <span class="text-dark-slate">AI</span></h3>
+        </div>
       </div>
-      <div id="loginError" class="error-msg" style="display:none"></div>
-      <button type="submit" class="btn btn-login-submit">Log In →</button>
-    </form>
-    <p class="login-hint">Default: admin@neurovibe.ai / admin@123</p>
+
+      <div class="marketing-content">
+        <!-- Recreated machine motor vector illustration component with premium saffron accent -->
+        <svg class="motor-illustration" viewBox="0 0 200 120" xmlns="http://w3.org">
+          <path d="M10 30 H50 V40 H10 Z M60 20 H140 V100 H60 Z" fill="#1e293b"/>
+          <rect x="70" y="30" width="10" height="60" fill="#ff9933"/>
+          <rect x="90" y="30" width="10" height="60" fill="#ff9933"/>
+          <rect x="110" y="30" width="10" height="60" fill="#ff9933"/>
+          <rect x="130" y="30" width="10" height="60" fill="#ff9933"/>
+          <path d="M140 45 H160 V75 H140 Z M160 35 H170 V85 H160 Z" fill="#334155"/>
+          <path d="M10 60 C 10 30, 40 30, 50 60 C 50 90, 20 90, 10 60" fill="none" stroke="#ff9933" stroke-width="3"/>
+        </svg>
+        <h2>IMPROVE ASSET PERFORMANCE</h2>
+        <p>Enterprise class AI and analytics platform for Asset Performance Management (APM). Improve asset reliability, availability and efficiency.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDE: PREMIUM LOGIN FORM -->
+    <div class="login-right-panel">
+      <form id="loginForm" class="split-form-wrap">
+        <div class="split-input-group">
+          <div class="input-icon-prefix">✉</div>
+          <input type="email" id="loginEmail" placeholder="Email" required />
+        </div>
+        
+        <div class="split-input-group">
+          <div class="input-icon-prefix">🔒</div>
+          <input type="password" id="loginPassword" placeholder="Password" required />
+        </div>
+
+        <div id="loginError" class="error-msg" style="display:none"></div>
+        
+        <button type="submit" class="btn btn-split-submit">Log In</button>
+        
+        <div class="form-footer-actions">
+          <a href="#" onclick="openForgotPasswordModal(event)" class="forgot-link-split">Forgot your password?</a>
+        </div>
+      </form>
+    </div>
+
   </div>
 </div>
 
@@ -114,7 +134,7 @@
         <div class="table-card">
           <div class="table-toolbar">
             <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('gwTable',this.value)" />
-            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')", style="display:none">⬇ Export CSV</button>
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')" style="display:none">⬇ Export CSV</button>
           </div>
           <div class="table-wrap">
             <table id="gwTable">
@@ -201,15 +221,3 @@
       <div class="topbar"><h1>📦 Import / Export</h1></div>
       <div class="content">
         <div class="import-grid">
-          <div class="import-card">
-            <h3>📡 Gateway Import</h3>
-            <p class="import-desc">Columns: Model, Serial No, IMEI, Radio MAC, LAN MAC, WAN MAC, BLE MAC, Frequency</p>
-            <label class="drop-zone" for="gwFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
-            <input type="file" id="gwFile" accept=".csv" style="display:none" onchange="importCSV('gateways',this)" />
-            <button class="btn btn-success admin-only-btn" onclick="exportCSV('gateways')">⬇ Export Gateways CSV</button>
-          </div>
-          <div class="import-card">
-            <h3>Node Import</h3>
-            <p class="import-desc">Columns: Model, Serial No, Radio MAC, BLE MAC, Frequency, AI Model</p>
-            <label class="drop-zone" for="nodeFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
-            <input type="file" id="nodeFile" accept=".csv" style="display:none" onchange="importCSV('nodes',this)" />
