@@ -23,11 +23,10 @@
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
           <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="white" stroke-width="4" stroke-linejoin="round"/>
           <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="white"/>
-          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#6366f1" opacity="0.15"/>
+          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#ff9933" opacity="0.15"/>
         </svg>
       </div>
-      <!-- Premium color combination styling: Bhagwa (Saffron) mixed with deep Charcoal Black -->
-      <h2><span style="color:#ff9933;">NeuroVibe</span> <span style="color:#111111; text-shadow: 0 0 1px rgba(255,255,255,0.2);">AI Technologies</span></h2>
+      <h2><span class="text-saffron">NEUROVIBE</span> <span class="text-premium-dark">AI TECHNOLOGIES</span></h2>
       <span>Pvt. Ltd. — IoT ML AI PdM Platform</span>
     </div>
     
@@ -36,17 +35,15 @@
         <label>Email Address</label>
         <input type="email" id="loginEmail" placeholder="admin@neurovibe.ai" required />
       </div>
-      <div class="form-group" style="position: relative;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="form-group">
+        <div class="password-label-container">
           <label>Password</label>
-          <!-- Clickable forgot password hyperlink trigger -->
-          <a href="#" onclick="openForgotPasswordModal(event)" style="color:#ff9933; font-size:0.72rem; text-decoration:none; font-weight:600; margin-bottom:7px; letter-spacing: 0.5px;">Forgot Password?</a>
+          <a href="#" onclick="openForgotPasswordModal(event)" class="forgot-link">Forgot Password?</a>
         </div>
         <input type="password" id="loginPassword" placeholder="••••••••" required />
       </div>
       <div id="loginError" class="error-msg" style="display:none"></div>
-      <!-- Updated action interface name to Log In -->
-      <button type="submit" class="btn btn-primary btn-full" style="background:#ff9933 !important;">Log In →</button>
+      <button type="submit" class="btn btn-login-submit">Log In →</button>
     </form>
     <p class="login-hint">Default: admin@neurovibe.ai / admin@123</p>
   </div>
@@ -60,10 +57,10 @@
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
           <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="white" stroke-width="4" stroke-linejoin="round"/>
           <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="white"/>
-          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#6366f1" opacity="0.15"/>
+          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#ff9933" opacity="0.15"/>
         </svg>
       </div>
-      <div><h2><span style="color:#ff9933;">NeuroVibe</span> <span style="color:#fff;">AI</span></h2><span>Pvt. Ltd. — IoT Platform</span></div>
+      <div><h2><span class="text-saffron">NeuroVibe</span> <span style="color:#fff;">AI</span></h2><span>Pvt. Ltd. — IoT Platform</span></div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section">OVERVIEW</div>
@@ -117,7 +114,7 @@
         <div class="table-card">
           <div class="table-toolbar">
             <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('gwTable',this.value)" />
-            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')" style="display:none">⬇ Export CSV</button>
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')", style="display:none">⬇ Export CSV</button>
           </div>
           <div class="table-wrap">
             <table id="gwTable">
@@ -212,3 +209,7 @@
             <button class="btn btn-success admin-only-btn" onclick="exportCSV('gateways')">⬇ Export Gateways CSV</button>
           </div>
           <div class="import-card">
+            <h3>Node Import</h3>
+            <p class="import-desc">Columns: Model, Serial No, Radio MAC, BLE MAC, Frequency, AI Model</p>
+            <label class="drop-zone" for="nodeFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
+            <input type="file" id="nodeFile" accept=".csv" style="display:none" onchange="importCSV('nodes',this)" />
