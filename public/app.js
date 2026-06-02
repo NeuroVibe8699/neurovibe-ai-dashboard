@@ -60,15 +60,39 @@ function logout() {
 async function showApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('appPage').style.display = 'flex';
-  document.getElementById('userAvatar').textContent = currentUser.name[0].toUpperCase();
-  document.getElementById('sideUserName').textContent = currentUser.name;
-  document.getElementById('sideUserRole').textContent = currentUser.role;
-  if (currentUser.role !== 'admin') {
-    document.querySelectorAll('[data-page="users"]').forEach(el => el.style.display = 'none');
+  
+  // Quick fallback check to ensure currentUser exists
+  if (!currentUser && localStorage.getItem('nv_user')) {
+    currentUser = JSON.parse(localStorage.getItem('nv_user'));
   }
+
+  document.getElementById('userAvatar').textContent = currentUser.name ? currentUser.name[0].toUpperCase() : 'A';
+  document.getElementById('sideUserName').textContent = currentUser.name || 'Admin';
+  document.getElementById('sideUserRole').textContent = currentUser.role || 'user';
+
+  // Sanitize the role parameter to ensure exact string matching
+  const userRole = String(currentUser.role).trim().toLowerCase();
+
+  if (userRole === 'admin') {
+    // Force target displays explicitly for administrators
+    document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'inline-flex', 'important'));
+    document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'flex', 'important'));
+  } else {
+    // Hard lock closures for operators/users
+    document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
+    document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  document.querySelectorAll('.nav-item').forEach(el => {
+    // Prevent duplicate event handlers attaching if called multiple times
+    el.replaceWith(el.cloneNode(true));
+  });
+
+  // Re-attach listeners to the fresh nodes
   document.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', () => showPage(el.dataset.page));
   });
+
   await loadAll();
   showPage('dashboard');
   setInterval(updateClock, 1000); updateClock();
