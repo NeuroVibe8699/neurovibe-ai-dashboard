@@ -93,7 +93,9 @@ async function initDB() {
 }
 
 function auth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+  const token = authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try { req.user = jwt.verify(token, JWT_SECRET); next(); }
   catch { res.status(401).json({ error: 'Invalid token' }); }
@@ -192,8 +194,6 @@ app.put('/api/motors/:id', auth, async (req, res) => {
     [motor_name, motor_tag, location, rpm, power_kw, voltage, current_a, bearing_type, sensor_type, alert_threshold, notes, req.params.id]);
   res.json(r.rows[0]);
 });
-
-// Fixed Truncated Router Endpoints & Hooks
 app.delete('/api/motors/:id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM motors WHERE id=$1', [req.params.id]);
@@ -201,7 +201,6 @@ app.delete('/api/motors/:id', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Added Missing Essential Site Management API Hooks
 app.get('/api/sites', auth, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM sites ORDER BY id DESC');
@@ -216,14 +215,12 @@ app.post('/api/sites', auth, async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// Essential Fallback Route Guard for serving Single Page App configurations correctly on Vercel [1]
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Initialize Database connection mappings and start execution loop listeners
 initDB().then(() => {
   app.listen(PORT, () => console.log(`Server executing cleanly on port ${PORT}`));
 });
 
-module.exports = app; // Required fallback bridge target for running via Vercel Serverless Functions
+module.exports = app;
