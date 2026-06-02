@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NeuroVibe AI - Dashboard</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
@@ -19,15 +19,14 @@
   
   <div class="login-card">
     <div class="login-logo">
-      <!-- Integrated custom corporate geometric vector logo SVG -->
       <div class="neurovibe-vector-logo login-logo-size">
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
           <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="white" stroke-width="4" stroke-linejoin="round"/>
           <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="white"/>
-          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#6366f1" opacity="0.15"/>
+          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#ff9933" opacity="0.15"/>
         </svg>
       </div>
-      <h2>NeuroVibe AI Technologies</h2>
+      <h2><span class="text-saffron">NEUROVIBE</span> <span class="text-premium-dark">AI TECHNOLOGIES</span></h2>
       <span>Pvt. Ltd. — IoT ML AI PdM Platform</span>
     </div>
     
@@ -37,36 +36,37 @@
         <input type="email" id="loginEmail" placeholder="admin@neurovibe.ai" required />
       </div>
       <div class="form-group">
-        <label>Password</label>
+        <div class="password-label-container">
+          <label>Password</label>
+          <a href="#" onclick="openForgotPasswordModal(event)" class="forgot-link">Forgot Password?</a>
+        </div>
         <input type="password" id="loginPassword" placeholder="••••••••" required />
       </div>
       <div id="loginError" class="error-msg" style="display:none"></div>
-      <button type="submit" class="btn btn-primary btn-full">Sign In →</button>
+      <button type="submit" class="btn btn-login-submit">Log In →</button>
     </form>
     <p class="login-hint">Default: admin@neurovibe.ai / admin@123</p>
   </div>
 </div>
 
-<!-- APP -->
+<!-- APP WORKSPACE VIEW -->
 <div id="appPage" class="app" style="display:none">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <!-- Embedded corporate geometric logo SVG for sidebar navigation header profile -->
       <div class="neurovibe-vector-logo sidebar-logo-size">
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://w3.org">
           <path d="M50 12 L63 38 L92 38 L68 55 L77 83 L50 66 L23 83 L32 55 L8 38 L37 38 Z" stroke="white" stroke-width="4" stroke-linejoin="round"/>
           <path d="M50 15 L39 38 L61 38 Z M28 50 L50 63 L35 73 Z M72 50 L65 73 L50 63 Z" fill="white"/>
-          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#6366f1" opacity="0.15"/>
+          <path d="M23 80 L50 62 L77 80 L67 52 L50 64 L33 52 Z" fill="#ff9933" opacity="0.15"/>
         </svg>
       </div>
-      <div><h2>NeuroVibe AI Technologies</h2><span>Pvt. Ltd. — IoT Platform</span></div>
+      <div><h2><span class="text-saffron">NeuroVibe</span> <span style="color:#fff;">AI</span></h2><span>Pvt. Ltd. — IoT Platform</span></div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section">OVERVIEW</div>
       <div class="nav-item active" data-page="dashboard"><span>📊</span> Dashboard</div>
       <div class="nav-section">INVENTORY</div>
       <div class="nav-item" data-page="gateways"><span>📡</span> Gateways</div>
-      <!-- Cleaned node menu name - removed plug emoji -->
       <div class="nav-item" data-page="nodes">Nodes</div>
       <div class="nav-section">MANAGEMENT</div>
       <div class="nav-item" data-page="sites"><span>🗺️</span> Site Mapping</div>
@@ -87,7 +87,6 @@
   </aside>
 
   <main class="main">
-
     <!-- DASHBOARD -->
     <div id="page-dashboard" class="page active">
       <div class="topbar">
@@ -98,7 +97,6 @@
         <div class="stats-grid" id="statsGrid"></div>
         <div class="charts-grid">
           <div class="chart-card"><div class="chart-title">📈 Live Sensor Readings</div><canvas id="sensorChart"></canvas></div>
-          <!-- Cleaned device distribution chart - removed plug emoji -->
           <div class="chart-card"><div class="chart-title">Device Distribution</div><canvas id="deviceChart"></canvas></div>
           <div class="chart-card"><div class="chart-title">🌡️ Temperature Trend</div><canvas id="tempChart"></canvas></div>
           <div class="chart-card"><div class="chart-title">📡 Gateway Frequency Split</div><canvas id="freqChart"></canvas></div>
@@ -116,7 +114,7 @@
         <div class="table-card">
           <div class="table-toolbar">
             <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('gwTable',this.value)" />
-            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')" style="display:none">⬇ Export CSV</button>
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')", style="display:none">⬇ Export CSV</button>
           </div>
           <div class="table-wrap">
             <table id="gwTable">
@@ -131,7 +129,6 @@
     <!-- NODES -->
     <div id="page-nodes" class="page">
       <div class="topbar">
-        <!-- Cleaned nodes layout page section banner header - removed plug emoji -->
         <h1>Nodes</h1>
         <button class="btn btn-primary admin-only-btn" onclick="openModal('nodeModal')" style="display:none">+ Add Node</button>
       </div>
@@ -173,7 +170,6 @@
             </div>
             <div class="map-toolbar" id="mapToolbar" style="display:none">
               <button class="btn btn-sm btn-outline" onclick="addPin('gateway')">📡 Add Gateway Pin</button>
-              <!-- Cleaned interactive floorplan editing workspace control toolbar button options - removed plug emoji -->
               <button class="btn btn-sm btn-outline" onclick="addPin('node')">Add Node Pin</button>
               <button class="btn btn-sm btn-primary" onclick="saveMap()">💾 Save Map</button>
             </div>
@@ -213,6 +209,7 @@
             <button class="btn btn-success admin-only-btn" onclick="exportCSV('gateways')">⬇ Export Gateways CSV</button>
           </div>
           <div class="import-card">
-            <!-- Cleaned bulk upload components cards wrapper - removed plug emoji -->
             <h3>Node Import</h3>
             <p class="import-desc">Columns: Model, Serial No, Radio MAC, BLE MAC, Frequency, AI Model</p>
+            <label class="drop-zone" for="nodeFile">📂 Click to upload CSV<br><small>or drag & drop</small></label>
+            <input type="file" id="nodeFile" accept=".csv" style="display:none" onchange="importCSV('nodes',this)" />
