@@ -93,9 +93,7 @@ async function initDB() {
 }
 
 function auth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-  const token = authHeader.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try { req.user = jwt.verify(token, JWT_SECRET); next(); }
   catch { res.status(401).json({ error: 'Invalid token' }); }
@@ -195,32 +193,75 @@ app.put('/api/motors/:id', auth, async (req, res) => {
   res.json(r.rows[0]);
 });
 app.delete('/api/motors/:id', auth, async (req, res) => {
-  try {
-    await pool.query('DELETE FROM motors WHERE id=$1', [req.params.id]);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  await pool.query('DELETE FROM motors WHERE id=$1', [req.params.id]);
+  res.json({ success: true });
 });
 
 app.get('/api/sites', auth, async (req, res) => {
-  try {
-    const r = await pool.query('SELECT * FROM sites ORDER BY id DESC');
-    res.json(r.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  const r = await pool.query('SELECT * FROM sites ORDER BY id DESC');
+  res.json(r.rows);
 });
 app.post('/api/sites', auth, async (req, res) => {
   const { name, location, description } = req.body;
+  const r = await pool.query('INSERT INTO sites (name,location,description) VALUES ($1,$2,$3) RETURNING *',
+    [name, location, description]);
+  res.json(r.rows[0]);
+});
+app.put('/api/sites/:id/map', auth, async (req, res) => {
+  const { map_data } = req.body;
+  const r = await pool.query('UPDATE sites SET map_data=$1 WHERE id=$2 RETURNING *',
+    [JSON.stringify(map_data), req.params.id]);
+  res.json(r.rows[0]);
+});
+app.delete('/api/sites/:id', auth, async (req, res) => {
+  await pool.query('DELETE FROM sites WHERE id=$1', [req.params.id]);
+  res.json({ success: true });
+});
+
+app.get('/api/dashboard/stats', auth, async (req, res) => {
   try {
-    const r = await pool.query('INSERT INTO sites (name, location, description) VALUES ($1, $2, $3) RETURNING *', [name, location, description]);
-    res.json(r.rows[0]);
-  } catch (err) { res.status(400).json({ error: err.message }); }
+    const [gw, nd, st, us, ai, mt] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM gateways'),
+      pool.query('SELECT COUNT(*) FROM nodes'),
+      pool.query('SELECT COUNT(*) FROM sites'),
+      pool.query('SELECT COUNT(*) FROM users'),
+      pool.query('SELECT COUNT(*) FROM nodes WHERE is_ai=true'),
+      pool.query('SELECT COUNT(*) FROM motors'),
+    ]);
+    res.json({
+      gateways: +gw.rows[0].count, nodes: +nd.rows[0].count,
+      sites: +st.rows[0].count, users: +us.rows[0].count,
+      ai_nodes: +ai.rows[0].count, motors: +mt.rows[0].count
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.post('/api/import/gateways', auth, async (req, res) => {
+  const { rows } = req.body; let count = 0;
+  for (const r of rows) {
+    try {
+      await pool.query(
+        'INSERT INTO gateways (model,serial_no,imei,radio_mac,lan_mac,wan_mac,ble_mac,frequency) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (serial_no) DO NOTHING',
+        [r.model, r.serial_no, r.imei, r.radio_mac, r.lan_mac, r.wan_mac, r.ble_mac, r.frequency]);
+      count++;
+    } catch {}
+  }
+  res.json({ imported: count });
 });
 
-initDB().then(() => {
-  app.listen(PORT, () => console.log(`Server executing cleanly on port ${PORT}`));
+app.post('/api/import/nodes', auth, async (req, res) => {
+  const { rows } = req.body; let count = 0;
+  for (const r of rows) {
+    try {
+      await pool.query(
+        'INSERT INTO nodes (model,serial_no,radio_mac,ble_mac,frequency,is_ai) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (serial_no) DO NOTHING',
+        [r.model, r.serial_no, r.radio_mac, r.ble_mac, r.frequency, r.is_ai === 'Yes']);
+      count++;
+    } catch {}
+  }
+  res.json({ imported: count });
 });
 
-module.exports = app;
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+initDB().then(() => app.listen(PORT, () => console.log(`NeuroVibe running on port ${PORT}`)));
