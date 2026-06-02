@@ -13,11 +13,10 @@
 <div id="loginPage" class="login-page">
   <div class="split-login-container">
     
-    <!-- LEFT SIDE: MARKETING & AUTOMATION INFRASTRUCTURE PANEL -->
+    <!-- LEFT SIDE: MARKETING & INDUSTRY INFRASTRUCTURE PANEL -->
     <div class="login-left-panel">
       <div class="brand-header">
         <div class="neurovibe-vector-logo left-logo-size">
-          <!-- Laser-sharp mathematical star vector layout -->
           <svg viewBox="0 0 100 100" xmlns="http://w3.org">
             <path d="M50,5 L64.5,34.5 L96.5,39 L73.5,61.5 L79,93.5 L50,78.5 L21,93.5 L26.5,61.5 L3.5,39 L35.5,34.5 Z" 
                   fill="none" stroke="#ff9933" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" />
@@ -32,18 +31,11 @@
       </div>
 
       <div class="marketing-content">
-        <!-- Exact corporate replica motor vector with sharp fins, conduit base, and waveform signal -->
         <svg class="motor-illustration" viewBox="0 0 240 160" xmlns="http://w3.org">
-          <!-- Live Telemetry Sine Waveform Signals -->
           <path d="M12,45 Q26,15 40,45 T68,45 T96,45 T124,45" fill="none" stroke="#3b82f6" stroke-width="4" stroke-linecap="round" />
-          <!-- Vertical Interconnecting Conduit Tube -->
           <path d="M40,45 V75" fill="none" stroke="#3b82f6" stroke-width="3" />
-          
-          <!-- Industrial Electric Motor Assembly Housing Body Base -->
           <g transform="translate(30, 60)">
-            <!-- Main Core Cylinder Block Frame -->
             <rect x="25" y="15" width="115" height="68" rx="8" fill="#3f51b5" />
-            <!-- Outer Core Cooling Fins Grid Patterns -->
             <line x1="40" y1="15" x2="40" y2="83" stroke="#ffffff" stroke-width="3" />
             <line x1="52" y1="15" x2="52" y2="83" stroke="#ffffff" stroke-width="3" />
             <line x1="64" y1="15" x2="64" y2="83" stroke="#ffffff" stroke-width="3" />
@@ -52,25 +44,16 @@
             <line x1="100" y1="15" x2="100" y2="83" stroke="#ffffff" stroke-width="3" />
             <line x1="112" y1="15" x2="112" y2="83" stroke="#ffffff" stroke-width="3" />
             <line x1="124" y1="15" x2="124" y2="83" stroke="#ffffff" stroke-width="3" />
-            
-            <!-- Structural Endbell Caps -->
             <path d="M25,15 H15 V83 H25 Z" fill="#2c3e50" />
             <path d="M140,15 H150 V83 H140 Z" fill="#2c3e50" />
-            <!-- Extended Output Drive Rotor Shaft Mount -->
             <rect x="150" y="42" width="22" height="14" rx="2" fill="#78909c" />
             <rect x="172" y="36" width="6" height="26" rx="1" fill="#455a64" />
-            <!-- Mounting Feet Flange Base Plates Plates -->
             <rect x="35" y="83" width="24" height="6" fill="#2c3e50" />
             <rect x="105" y="83" width="24" height="6" fill="#2c3e50" />
-            <!-- Upward Facing Terminal Conduit Junction Connection Box -->
             <path d="M30,15 L33,4 H52 L55,15 Z" fill="#2c3e50" />
-            
-            <!-- Real-Time Environmental Dynamic Force Arrow Vectors -->
             <g stroke="#3f51b5" stroke-width="2.5" fill="none" stroke-linecap="round">
-              <!-- Upper Boundary Arrows -->
               <path d="M42,-12 V-2 M42,-2 L38,-6 M42,-2 L46,-6" />
               <path d="M115,-12 V-2 M115,-2 L111,-6 M115,-2 L119,-6" />
-              <!-- Lower Boundary Footprint Alignment Anchor Arrows -->
               <path d="M52,102 V92 M52,102 L48,98 M52,102 L56,98" />
               <path d="M105,102 V92 M105,102 L101,98 M105,102 L109,98" />
             </g>
@@ -81,7 +64,7 @@
       </div>
     </div>
 
-    <!-- RIGHT SIDE: LOGIN USER SYSTEM INPUT PORTAL -->
+    <!-- RIGHT SIDE: PREMIUM FORM DATA GATEWAY -->
     <div class="login-right-panel">
       <form id="loginForm" class="split-form-wrap">
         <div class="split-input-group">
@@ -171,7 +154,7 @@
         <div class="table-card">
           <div class="table-toolbar">
             <input class="search-input" placeholder="🔍 Search..." oninput="filterTable('gwTable',this.value)" />
-            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')" style="display:none">⬇ Export CSV</button>
+            <button class="btn btn-outline admin-only-btn" onclick="exportCSV('gateways')", style="display:none">⬇ Export CSV</button>
           </div>
           <div class="table-wrap">
             <table id="gwTable">
@@ -197,3 +180,29 @@
           </div>
           <div class="table-wrap">
             <table id="nodeTable">
+              <thead><tr><th>Model</th><th>Serial No</th><th>Radio MAC</th><th>BLE MAC</th><th>Freq</th><th>Type</th><th>Gateway</th><th>Site</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="nodeBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SITES -->
+    <div id="page-sites" class="page">
+      <div class="topbar">
+        <h1>🗺️ Site Mapping</h1>
+        <button class="btn btn-primary admin-only-btn" onclick="openModal('siteModal')" style="display:none">+ Add Site</button>
+      </div>
+      <div class="content">
+        <div class="sites-layout">
+          <div class="sites-list" id="sitesList"></div>
+          <div class="map-container">
+            <div class="map-header">
+              <h3 id="mapTitle">Select a site</h3>
+              <div class="map-legend">
+                <span><span class="dot gw"></span> Gateway</span>
+                <span><span class="dot nd"></span> Node</span>
+              </div>
+            </div>
+            <div class="map-canvas" id="mapCanvas">
