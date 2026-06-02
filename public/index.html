@@ -64,19 +64,18 @@ async function showApp() {
     currentUser = JSON.parse(localStorage.getItem('nv_user'));
   }
 
-  document.getElementById('userAvatar').textContent = currentUser.name ? currentUser.name[0].toUpperCase() : 'A';
-  document.getElementById('sideUserName').textContent = currentUser.name || 'Admin';
-  document.getElementById('sideUserRole').textContent = currentUser.role || 'user';
+  // Fixing avatar crash safety check
+  const firstLetter = currentUser && currentUser.name ? currentUser.name[0].toUpperCase() : 'A';
+  document.getElementById('userAvatar').textContent = firstLetter;
+  document.getElementById('sideUserName').textContent = currentUser ? currentUser.name : 'Admin';
+  document.getElementById('sideUserRole').textContent = currentUser ? currentUser.role : 'user';
 
-  // Sanitized text string verification check
-  const userRole = String(currentUser.role).trim().toLowerCase();
+  const userRole = String(currentUser ? currentUser.role : 'user').trim().toLowerCase();
 
   if (userRole === 'admin') {
-    // Reveal all hardware modification controls for administrators
     document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'inline-flex', 'important'));
     document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'flex', 'important'));
   } else {
-    // Restrict standard operator interfaces completely
     document.querySelectorAll('.admin-only-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
     document.querySelectorAll('[data-page="users"]').forEach(el => el.style.setProperty('display', 'none', 'important'));
   }
@@ -111,7 +110,12 @@ async function api(url, method = 'GET', body = null) {
 }
 
 async function loadAll() {
-  [gateways, nodes, sites] = await Promise.all([api('/api/gateways'), api('/api/nodes'), api('/api/sites')]);
+  // Graceful fallback arrays if your API endpoints don't return data objects yet
+  try {
+    [gateways, nodes, sites] = await Promise.all([api('/api/gateways'), api('/api/nodes'), api('/api/sites')]);
+  } catch(e) {
+    console.warn("API collections endpoints not running yet. Using empty arrays.");
+  }
   gateways = gateways || []; nodes = nodes || []; sites = sites || [];
 }
 
@@ -130,10 +134,9 @@ function showPage(page) {
   if (page === 'nodes') renderNodes();
   if (page === 'sites') {
     renderSites();
-    // Protect interactive map tools dynamically from page view hooks
     const mapToolbar = document.getElementById('mapToolbar');
     if (mapToolbar) {
-      const userRole = String(currentUser.role).trim().toLowerCase();
+      const userRole = String(currentUser ? currentUser.role : 'user').trim().toLowerCase();
       mapToolbar.style.display = (userRole === 'admin') ? 'flex' : 'none';
     }
   }
@@ -142,8 +145,9 @@ function showPage(page) {
 
 // ===== DASHBOARD =====
 async function renderDashboard() {
-  const stats = await api('/api/dashboard/stats') || {};
-  // Removed plug icon code parameters completely from the nodes row array configuration
+  let stats = {};
+  try { stats = await api('/api/dashboard/stats') || {}; } catch(e) {}
+  
   const cards = [
     { icon:'📡', label:'Gateways',    value:stats.gateways||0,  sub:'Total registered',    g:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
     { icon:'',   label:'Nodes',       value:stats.nodes||0,     sub:`${stats.ai_nodes||0} AI-enabled`, g:'linear-gradient(90deg,#10b981,#059669)' },
@@ -205,9 +209,3 @@ function initCharts() {
     if (freqChart) freqChart.destroy();
     freqChart = new Chart(freqCtx, {
       type:'line', data:{labels:['10Hz','20Hz','50Hz','100Hz','200Hz','500Hz'], datasets:[{label:'Spectral Amplitude', data:rand(0.1,2.5,6), borderColor:'#8b5cf6', tension:0.1}]},
-      options:{responsive:true, plugins:{legend:{position:'bottom'}}}
-    });
-  }
-}
-
-function updateCharts() {
