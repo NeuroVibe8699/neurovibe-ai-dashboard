@@ -860,3 +860,217 @@ function previewCloudConfig(id) { updateCloudPreview(id); toast('☁️ Config p
 
 async function addMotor() {
   const res = await api(`/api/nodes/${congNode.id}/motors`,'POST',{motor_name:'',
+// ===== SITES =====
+function renderSites() {
+  document.getElementById('sitesList').innerHTML = sites.length===0
+    ?'<div style="padding:20px;text-align:center;color:var(--muted);">No sites yet</div>'
+    :sites.map(s=>`<div class="site-item ${currentSite?.id===s.id?'active':''}" onclick="selectSite(${s.id})"><h4>🏭 ${s.name}</h4><p>${s.location||'No location'}</p></div>`).join('');
+}
+
+function selectSite(id) {
+  currentSite=sites.find(s=>s.id===id);
+  document.getElementById('mapTitle').textContent=`🗺️ ${currentSite.name}`;
+  document.getElementById('mapEmpty').style.display='none';
+  document.getElementById('mapToolbar').style.display='flex';
+  renderMap(); renderSites();
+}
+
+function renderMap() {
+  document.querySelectorAll('#mapCanvas .map-pin').forEach(p=>p.remove());
+  (currentSite.map_data||[]).forEach(pin=>addPinToMap(pin));
+}
+
+function addPinToMap(pin) {
+  const canvas=document.getElementById('mapCanvas');
+  const el=document.createElement('div');
+  el.className='map-pin';
+  el.style.left=pin.x+'%'; el.style.top=pin.y+'%';
+  el.dataset.pinId=pin.id;
+  el.innerHTML=`
+    <div class="pin-marker ${pin.type}" title="${pin.label}">
+      ${pin.type==='gw'?'📡':NODE_ICON_SVG}
+    </div>
+    <div class="pin-label">${pin.label}</div>
+    <div class="pin-actions">
+      ${pin.type==='nd'?`<span class="pin-btn" onclick="openPinConfig(${pin.nodeId})">⚙️</span>`:''}
+      ${pin.type==='nd'?`<span class="pin-btn" onclick="startMovePin(${pin.id})">✋</span>`:''}
+      ${pin.type==='nd'?`<span class="pin-btn" onclick="openNodeData(${pin.nodeId})">📊</span>`:''}
+      ${pin.type==='gw'?`<span class="pin-btn" onclick="showGatewayNodes(${pin.gatewayId})">👁️</span>`:''}
+      <span class="pin-btn" onclick="deletePin(${pin.id})">🗑️</span>
+    </div>`;
+  canvas.appendChild(el);
+}
+
+function startMovePin(pinId) {
+  movingPinId=pinId;
+  toast('✋ Map pe click karo jahan move karna hai','info');
+}
+
+function deletePin(pinId) {
+  currentSite.map_data=(currentSite.map_data||[]).filter(p=>p.id!==pinId);
+  document.querySelector(`[data-pin-id="${pinId}"]`)?.remove();
+  toast('Pin deleted','success');
+}
+
+function openPinConfig(nodeId) {
+  if(!nodeId){toast('Node linked nahi hai','warning');return;}
+  const node=nodes.find(n=>n.id===parseInt(nodeId));
+  if(!node){toast('Node nahi mila!','error');return;}
+  openCongregation(node.id);
+}
+
+function showGatewayNodes(gatewayId) {
+  if(!gatewayId){toast('Gateway linked nahi hai','warning');return;}
+  const gw=gateways.find(g=>g.id===parseInt(gatewayId));
+  const gwNodes=nodes.filter(n=>n.gateway_id===parseInt(gatewayId));
+  document.getElementById('gwPopup')?.remove();
+  const popup=document.createElement('div');
+  popup.id='gwPopup'; popup.className='gw-popup';
+  popup.innerHTML=`
+    <div class="gw-popup-header">
+      <h4>📡 ${gw?gw.model:'Gateway'}</h4>
+      <button onclick="document.getElementById('gwPopup').remove()">✕</button>
+    </div>
+    <div class="gw-popup-body">
+      ${gwNodes.length===0?'<p style="color:var(--muted);text-align:center;padding:20px;">No nodes linked</p>'
+        :gwNodes.map(n=>`<div class="gw-node-item" onclick="openCongregation(${n.id})">
+          <span class="badge badge-purple">${n.model}</span>
+          <span class="mono">${n.serial_no}</span>
+        </div>`).join('')}
+    </div>`;
+  document.body.appendChild(popup);
+}
+
+function addPin(type) {
+  addingPin=type;
+  toast(`Click map to place ${type==='gateway'?'📡 Gateway':'🔌 Node'} pin`,'info');
+}
+
+document.getElementById('mapCanvas').addEventListener('click', e=>{
+  const rect=e.currentTarget.getBoundingClientRect();
+  const x=((e.clientX-rect.left)/rect.width*100).toFixed(1);
+  const y=((e.clientY-rect.top)/rect.height*100).toFixed(1);
+  if(movingPinId){
+    const pinEl=document.querySelector(`[data-pin-id="${movingPinId}"]`);
+    if(pinEl){pinEl.style.left=x+'%';pinEl.style.top=y+'%';}
+    const p=currentSite.map_data.find(p=>p.id===movingPinId);
+    if(p){p.x=x;p.y=y;}
+    movingPinId=null;
+    toast('Pin moved!','success');
+    return;
+  }
+  if(!addingPin||!currentSite) return;
+  const label=prompt('Label:',addingPin==='gateway'?'GW-01':'ND-01');
+  if(!label){addingPin=null;return;}
+  let nodeId=null,gatewayId=null;
+  if(addingPin==='node'&&nodes.length>0){
+    const sel=nodes.map((n,i)=>`${i+1}. ${n.model} - ${n.serial_no}`).join('\n');
+    const choice=prompt(`Konsa node?\n\n${sel}\n\nNumber daalo:`);
+    const idx=parseInt(choice)-1;
+    if(idx>=0&&nodes[idx]) nodeId=nodes[idx].id;
+  }
+  if(addingPin==='gateway'&&gateways.length>0){
+    const sel=gateways.map((g,i)=>`${i+1}. ${g.model} - ${g.serial_no}`).join('\n');
+    const choice=prompt(`Konsa gateway?\n\n${sel}\n\nNumber daalo:`);
+    const idx=parseInt(choice)-1;
+    if(idx>=0&&gateways[idx]) gatewayId=gateways[idx].id;
+  }
+  const pin={id:Date.now(),type:addingPin==='gateway'?'gw':'nd',x,y,label,nodeId,gatewayId};
+  if(!currentSite.map_data) currentSite.map_data=[];
+  currentSite.map_data.push(pin);
+  addPinToMap(pin);
+  addingPin=null;
+});
+
+async function saveMap() {
+  if(!currentSite) return;
+  await api(`/api/sites/${currentSite.id}/map`,'PUT',{map_data:currentSite.map_data});
+  toast('Map saved! ✅','success');
+}
+
+async function submitSite(e) {
+  e.preventDefault();
+  const body={name:document.getElementById('siteName').value,location:document.getElementById('siteLocation').value,description:document.getElementById('siteDesc').value};
+  const res=await api('/api/sites','POST',body);
+  if(res&&res.id){sites.unshift(res);closeModal('siteModal');e.target.reset();renderSites();toast('Site added!','success');}
+}
+
+// ===== USERS =====
+async function loadUsers() {
+  const users=await api('/api/users')||[];
+  document.getElementById('userBody').innerHTML=users.map(u=>`
+    <tr>
+      <td><strong>${u.name}</strong></td>
+      <td>${u.email}</td>
+      <td><span class="badge ${u.role==='admin'?'badge-purple':'badge-gray'}">${u.role}</span></td>
+      <td style="font-size:0.78rem;color:var(--muted);">${new Date(u.created_at).toLocaleDateString('en-IN')}</td>
+      <td>${u.email!=='admin@neurovibe.ai'?`<button class="btn-icon" onclick="deleteUser(${u.id})">🗑️</button>`:'-'}</td>
+    </tr>`).join('');
+}
+
+async function submitUser(e) {
+  e.preventDefault();
+  const body={name:document.getElementById('uName').value,email:document.getElementById('uEmail').value,password:document.getElementById('uPassword').value,role:document.getElementById('uRole').value};
+  const res=await api('/api/users','POST',body);
+  if(res&&res.id){closeModal('userModal');e.target.reset();loadUsers();toast('User created!','success');}
+  else toast(res?.error||'Error','error');
+}
+
+async function deleteUser(id) {
+  if(!confirm('Delete user?')) return;
+  await api(`/api/users/${id}`,'DELETE');
+  loadUsers(); toast('Deleted','success');
+}
+
+// ===== IMPORT/EXPORT =====
+async function importCSV(type,input) {
+  const file=input.files[0]; if(!file) return;
+  const text=await file.text();
+  const lines=text.split('\n').filter(l=>l.trim());
+  const headers=lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  const rows=lines.slice(1).map(line=>{
+    const vals=line.split(',').map(v=>v.replace(/"/g,'').trim());
+    const obj={}; headers.forEach((h,i)=>obj[h]=vals[i]||'');
+    return type==='gateways'
+      ?{model:obj['Model'],serial_no:obj['Serial No'],imei:obj['IMEI'],radio_mac:obj['Radio MAC'],lan_mac:obj['LAN MAC'],wan_mac:obj['WAN MAC'],ble_mac:obj['BLE MAC'],frequency:obj['Frequency']}
+      :{model:obj['Model'],serial_no:obj['Serial No'],radio_mac:obj['Radio MAC'],ble_mac:obj['BLE MAC'],frequency:obj['Frequency'],is_ai:obj['AI Model']};
+  });
+  const res=await api(`/api/import/${type}`,'POST',{rows});
+  toast(`${res?.imported||0} ${type} imported!`,'success');
+  await loadAll();
+  if(type==='gateways') renderGateways(); else renderNodes();
+}
+
+function exportCSV(type) {
+  let headers,rows;
+  if(type==='gateways'){headers=['Model','Serial No','IMEI','Radio MAC','LAN MAC','WAN MAC','BLE MAC','Frequency','Site'];rows=gateways.map(g=>[g.model,g.serial_no,g.imei,g.radio_mac,g.lan_mac,g.wan_mac,g.ble_mac,g.frequency,g.site]);}
+  else{headers=['Model','Serial No','Radio MAC','BLE MAC','Frequency','AI Model','Site'];rows=nodes.map(n=>[n.model,n.serial_no,n.radio_mac,n.ble_mac,n.frequency,n.is_ai?'Yes':'No',n.site]);}
+  const csv=[headers,...rows].map(r=>r.map(c=>`"${c||''}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`neurovibe_${type}_${Date.now()}.csv`;
+  a.click(); toast(`${type} exported!`,'success');
+}
+
+function filterTable(tableId,query) {
+  const q=query.toLowerCase();
+  document.querySelectorAll(`#${tableId} tbody tr`).forEach(row=>{
+    row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+
+function openModal(id){document.getElementById(id).style.display='flex';}
+function closeModal(id){document.getElementById(id).style.display='none';}
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el) el.style.display='none';});
+});
+
+function toast(msg,type='info'){
+  const c=document.getElementById('toastContainer');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+  t.innerHTML=`${icons[type]||'ℹ️'} ${msg}`;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
