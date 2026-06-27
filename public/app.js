@@ -28,14 +28,138 @@ const INTERVAL_OPTIONS = [
   { label:'24 Hours',   ms:86400000 },
 ];
 
+// ===== DEMO DATA STORE =====
+let _demoGateways = [], _demoNodes = [], _demoSites = [], _demoUsers = [
+  { id:1, name:'Admin', email:'admin@neurovibe.ai', role:'admin', created_at: new Date().toISOString() }
+];
+let _demoMotors = {};
+let _demoIdCounter = 100;
+
+function demoApi(url, method, body) {
+  const newId = () => ++_demoIdCounter;
+
+  if (url === '/api/dashboard/stats') return Promise.resolve({
+    gateways: _demoGateways.length, nodes: _demoNodes.length,
+    sites: _demoSites.length, users: _demoUsers.length,
+    ai_nodes: _demoNodes.filter(n=>n.is_ai).length,
+    motors: Object.values(_demoMotors).flat().length
+  });
+
+  // GATEWAYS
+  if (url === '/api/gateways' && method === 'GET') return Promise.resolve([..._demoGateways]);
+  if (url === '/api/gateways' && method === 'POST') {
+    const gw = { id:newId(), ...body, status:'active' };
+    _demoGateways.unshift(gw); return Promise.resolve(gw);
+  }
+  if (url.match(/\/api\/gateways\/\d+/) && method === 'DELETE') {
+    const gid = parseInt(url.split('/')[3]);
+    _demoGateways = _demoGateways.filter(g=>g.id!==gid);
+    return Promise.resolve({});
+  }
+
+  // NODES
+  if (url === '/api/nodes' && method === 'GET') return Promise.resolve([..._demoNodes]);
+  if (url === '/api/nodes' && method === 'POST') {
+    const gw = _demoGateways.find(g=>g.id===parseInt(body.gateway_id));
+    const nd = { id:newId(), ...body, status:'active', gateway_model: gw?.model||null };
+    _demoNodes.unshift(nd); return Promise.resolve(nd);
+  }
+  if (url.match(/\/api\/nodes\/\d+\/motors/) && method === 'GET') {
+    const nid = parseInt(url.split('/')[3]);
+    return Promise.resolve(_demoMotors[nid] || []);
+  }
+  if (url.match(/\/api\/nodes\/\d+\/motors/) && method === 'POST') {
+    const nid = parseInt(url.split('/')[3]);
+    const motor = { id:newId(), ...body, health_score:100 };
+    if (!_demoMotors[nid]) _demoMotors[nid] = [];
+    _demoMotors[nid].push(motor); return Promise.resolve(motor);
+  }
+  if (url.match(/\/api\/nodes\/\d+/) && method === 'DELETE') {
+    const nid = parseInt(url.split('/')[3]);
+    _demoNodes = _demoNodes.filter(n=>n.id!==nid);
+    return Promise.resolve({});
+  }
+
+  // MOTORS
+  if (url.match(/\/api\/motors\/\d+/) && method === 'PUT') {
+    const mid = parseInt(url.split('/')[3]);
+    for (const nid in _demoMotors) {
+      const idx = _demoMotors[nid].findIndex(m=>m.id===mid);
+      if (idx !== -1) {
+        _demoMotors[nid][idx] = { ..._demoMotors[nid][idx], ...body, id:mid };
+        return Promise.resolve(_demoMotors[nid][idx]);
+      }
+    }
+    return Promise.resolve({});
+  }
+  if (url.match(/\/api\/motors\/\d+/) && method === 'DELETE') {
+    const mid = parseInt(url.split('/')[3]);
+    for (const nid in _demoMotors) {
+      _demoMotors[nid] = _demoMotors[nid].filter(m=>m.id!==mid);
+    }
+    return Promise.resolve({});
+  }
+
+  // SITES
+  if (url === '/api/sites' && method === 'GET') return Promise.resolve([..._demoSites]);
+  if (url === '/api/sites' && method === 'POST') {
+    const site = { id:newId(), ...body, map_data:[] };
+    _demoSites.unshift(site); return Promise.resolve(site);
+  }
+  if (url.match(/\/api\/sites\/\d+\/map/) && method === 'PUT') {
+    const sid = parseInt(url.split('/')[3]);
+    const site = _demoSites.find(s=>s.id===sid);
+    if (site) site.map_data = body.map_data;
+    return Promise.resolve({});
+  }
+
+  // USERS
+  if (url === '/api/users' && method === 'GET') return Promise.resolve([..._demoUsers]);
+  if (url === '/api/users' && method === 'POST') {
+    const user = { id:newId(), ...body, created_at: new Date().toISOString() };
+    _demoUsers.push(user); return Promise.resolve(user);
+  }
+  if (url.match(/\/api\/users\/\d+/) && method === 'DELETE') {
+    const uid = parseInt(url.split('/')[3]);
+    _demoUsers = _demoUsers.filter(u=>u.id!==uid);
+    return Promise.resolve({});
+  }
+
+  // IMPORT
+  if (url.match(/\/api\/import\//) && method === 'POST') {
+    const type = url.split('/')[3];
+    if (type === 'gateways') {
+      body.rows.forEach(r => { if(r.model) _demoGateways.push({ id:newId(), ...r, status:'active' }); });
+      return Promise.resolve({ imported: body.rows.length });
+    } else {
+      body.rows.forEach(r => { if(r.model) _demoNodes.push({ id:newId(), ...r, status:'active' }); });
+      return Promise.resolve({ imported: body.rows.length });
+    }
+  }
+
+  return Promise.resolve(null);
+}
+
 // ===== AUTH =====
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
+
+  // Demo login - backend ke bina kaam karega
+  if (email === 'admin@neurovibe.ai' && password === 'admin@123') {
+    token = 'demo-token';
+    currentUser = { name:'Admin', role:'admin', email:'admin@neurovibe.ai' };
+    localStorage.setItem('nv_token', token);
+    localStorage.setItem('nv_user', JSON.stringify(currentUser));
+    showApp();
+    return;
+  }
+
+  // Real backend login
   try {
     const res = await fetch(`${API}/api/auth/login`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
@@ -46,7 +170,8 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     showApp();
   } catch (err) {
     const el = document.getElementById('loginError');
-    el.textContent = err.message; el.style.display = 'block';
+    el.textContent = 'Invalid email or password';
+    el.style.display = 'block';
   }
 });
 
@@ -77,13 +202,14 @@ async function showApp() {
 
 function updateClock() {
   const el = document.getElementById('dashTime');
-  if (el) el.textContent = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
+  if (el) el.textContent = new Date().toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'medium' });
 }
 
 if (token && currentUser) showApp();
 
 async function api(url, method = 'GET', body = null) {
-  const opts = { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+  if (token === 'demo-token') return demoApi(url, method, body);
+  const opts = { method, headers: { 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${API}${url}`, opts);
   if (res.status === 401) { logout(); return null; }
@@ -113,12 +239,12 @@ function showPage(page) {
 async function renderDashboard() {
   const stats = await api('/api/dashboard/stats') || {};
   const cards = [
-    { icon:'📡', label:'Gateways',    value:stats.gateways||0,  sub:'Total registered',    g:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
-    { icon:'🔌', label:'Nodes',       value:stats.nodes||0,     sub:`${stats.ai_nodes||0} AI-enabled`, g:'linear-gradient(90deg,#10b981,#059669)' },
-    { icon:'🗺️', label:'Sites',       value:stats.sites||0,     sub:'Plant locations',      g:'linear-gradient(90deg,#f59e0b,#d97706)' },
-    { icon:'👥', label:'Users',       value:stats.users||0,     sub:'Platform users',       g:'linear-gradient(90deg,#06b6d4,#0891b2)' },
-    { icon:'🤖', label:'AI Nodes',    value:stats.ai_nodes||0,  sub:'AI-enabled devices',   g:'linear-gradient(90deg,#8b5cf6,#6d28d9)' },
-    { icon:'⚙️', label:'Motors',      value:stats.motors||0,    sub:'Assigned motors',      g:'linear-gradient(90deg,#ef4444,#dc2626)' },
+    { icon:'📡', label:'Gateways',  value:stats.gateways||0, sub:'Total registered',       g:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
+    { icon:'🔌', label:'Nodes',     value:stats.nodes||0,    sub:`${stats.ai_nodes||0} AI-enabled`, g:'linear-gradient(90deg,#10b981,#059669)' },
+    { icon:'🗺️', label:'Sites',     value:stats.sites||0,    sub:'Plant locations',         g:'linear-gradient(90deg,#f59e0b,#d97706)' },
+    { icon:'👥', label:'Users',     value:stats.users||0,    sub:'Platform users',          g:'linear-gradient(90deg,#06b6d4,#0891b2)' },
+    { icon:'🤖', label:'AI Nodes',  value:stats.ai_nodes||0, sub:'AI-enabled devices',      g:'linear-gradient(90deg,#8b5cf6,#6d28d9)' },
+    { icon:'⚙️', label:'Motors',    value:stats.motors||0,   sub:'Assigned motors',         g:'linear-gradient(90deg,#ef4444,#dc2626)' },
   ];
   document.getElementById('statsGrid').innerHTML = cards.map(c => `
     <div class="stat-card" style="--g:${c.g}">
@@ -212,12 +338,7 @@ function renderNodes() {
   document.getElementById('nodeBody').innerHTML = nodes.length === 0
     ? '<tr><td colspan="10" style="text-align:center;padding:40px;color:#64748b;">No nodes yet.</td></tr>'
     : nodes.map(n => `<tr>
-        <td>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;">${NODE_ICON_SVG}</span>
-            <span class="badge badge-purple">${n.model}</span>
-          </div>
-        </td>
+        <td><div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;">${NODE_ICON_SVG}</span><span class="badge badge-purple">${n.model}</span></div></td>
         <td class="mono">${n.serial_no}</td>
         <td class="mono">${n.radio_mac||'-'}</td>
         <td class="mono">${n.ble_mac||'-'}</td>
@@ -349,8 +470,6 @@ function openNodeData(nodeId) {
 
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) closeNodeData(); });
-
-  // ✅ FIX: Pehle spectrum tab temporarily visible karo, phir charts init karo
   initNodeDataCharts();
   startLiveData();
 }
@@ -363,56 +482,28 @@ function closeNodeData() {
   document.getElementById('nodeDataModal')?.remove();
 }
 
-// ✅ FIX: Tab switch hone par charts resize karo
 function switchDataTab(tab, btn) {
   document.querySelectorAll('.data-tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.data-tab').forEach(b => b.classList.remove('active'));
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   btn.classList.add('active');
-
   setTimeout(() => {
-    if (tab === 'spectrum') {
-      nodeDataCharts.spectrum?.resize();
-      nodeDataCharts.ultra?.resize();
-    } else if (tab === 'rms') {
-      SENSOR_LIST.forEach(s => nodeDataCharts[`rms_${s.key}`]?.resize());
-    } else if (tab === 'ptp') {
-      nodeDataCharts.ptp?.resize();
-    } else if (tab === 'water') {
-      // water mein charts nahi hain, kuch nahi
-    }
+    if (tab === 'spectrum') { nodeDataCharts.spectrum?.resize(); nodeDataCharts.ultra?.resize(); }
+    else if (tab === 'rms') { SENSOR_LIST.forEach(s => nodeDataCharts[`rms_${s.key}`]?.resize()); }
+    else if (tab === 'ptp') { nodeDataCharts.ptp?.resize(); }
   }, 50);
 }
 
 function onSensorChange() { renderOverallCharts(); }
-
-function onIntervalChange() {
-  if (nodeDataInterval) clearInterval(nodeDataInterval);
-  startLiveData();
-}
-
-function startLiveData() {
-  updateLiveData();
-  nodeDataInterval = setInterval(updateLiveData, 3000);
-}
+function onIntervalChange() { if (nodeDataInterval) clearInterval(nodeDataInterval); startLiveData(); }
+function startLiveData() { updateLiveData(); nodeDataInterval = setInterval(updateLiveData, 3000); }
 
 function initNodeDataCharts() {
   renderOverallCharts();
-
-  // ✅ FIX: Spectrum charts hidden tab mein bhi sahi initialize hon
   const tabEl = document.getElementById('tab-spectrum');
-  if (tabEl) {
-    tabEl.style.display = 'block';
-    tabEl.style.visibility = 'hidden';
-    tabEl.style.position = 'absolute';
-  }
+  if (tabEl) { tabEl.style.display='block'; tabEl.style.visibility='hidden'; tabEl.style.position='absolute'; }
   renderSpectrumCharts();
-  if (tabEl) {
-    tabEl.style.display = '';
-    tabEl.style.visibility = '';
-    tabEl.style.position = '';
-  }
-
+  if (tabEl) { tabEl.style.display=''; tabEl.style.visibility=''; tabEl.style.position=''; }
   renderRmsCards();
   renderWaterCards();
   renderPtpCards();
@@ -423,188 +514,4 @@ function renderOverallCharts() {
   if (!grid) return;
   const sel = document.getElementById('sensorSelect')?.value || 'all';
   const list = sel === 'all' ? SENSOR_LIST : SENSOR_LIST.filter(s => s.key === sel);
-  list.forEach(s => { if (nodeDataCharts[s.key]) { try { nodeDataCharts[s.key].destroy(); } catch {} delete nodeDataCharts[s.key]; } });
-  grid.innerHTML = list.map(s => `
-    <div class="nd-chart-card">
-      <div class="nd-chart-title" style="color:${s.color};">${s.label} (${s.unit})</div>
-      <canvas id="chart_${s.key}" height="100"></canvas>
-    </div>`).join('');
-  list.forEach(s => {
-    nodeDataCharts[s.key] = new Chart(document.getElementById(`chart_${s.key}`), {
-      type:'line',
-      data:{labels:Array.from({length:20},(_,i)=>`${i}s`), datasets:[{label:s.label, data:Array.from({length:20},()=>+(Math.random()*(s.max-s.min)+s.min).toFixed(2)), borderColor:s.color, backgroundColor:s.color+'22', tension:0.4, fill:true, pointRadius:2, borderWidth:2}]},
-      options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{y:{min:s.min,max:s.max,grid:{color:'#f1f5f9'}},x:{display:false}}}
-    });
-  });
-}
-
-// ✅ FIX: Ultrasound chart sahi se initialize hoga
-function renderSpectrumCharts() {
-  const fl = Array.from({length:50},(_,i)=>`${i*10}Hz`);
-
-  if (nodeDataCharts.spectrum) { try { nodeDataCharts.spectrum.destroy(); } catch {} delete nodeDataCharts.spectrum; }
-  if (nodeDataCharts.ultra) { try { nodeDataCharts.ultra.destroy(); } catch {} delete nodeDataCharts.ultra; }
-
-  const specEl = document.getElementById('spectrumChart');
-  const ultraEl = document.getElementById('ultraChart');
-  if (!specEl || !ultraEl) return;
-
-  nodeDataCharts.spectrum = new Chart(specEl, {
-    type:'bar',
-    data:{
-      labels: fl,
-      datasets:[{
-        label:'Vibration Spectrum (mm/s)',
-        data:Array.from({length:50},()=>+(Math.random()*10).toFixed(2)),
-        backgroundColor:'#6366f1aa',
-        borderColor:'#6366f1',
-        borderWidth:1
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      animation:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        y:{beginAtZero:true, grid:{color:'#f1f5f9'}},
-        x:{ticks:{maxTicksLimit:10}, grid:{display:false}}
-      }
-    }
-  });
-
-  nodeDataCharts.ultra = new Chart(ultraEl, {
-    type:'bar',
-    data:{
-      labels: fl,
-      datasets:[{
-        label:'Ultrasound Spectrum (dB)',
-        data:Array.from({length:50},()=>+(Math.random()*8).toFixed(2)),
-        backgroundColor:'#06b6d4aa',
-        borderColor:'#06b6d4',
-        borderWidth:1
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      animation:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        y:{beginAtZero:true, grid:{color:'#f1f5f9'}},
-        x:{ticks:{maxTicksLimit:10}, grid:{display:false}}
-      }
-    }
-  });
-}
-
-function renderRmsCards() {
-  const grid = document.getElementById('rmsGrid');
-  if (!grid) return;
-  grid.innerHTML = SENSOR_LIST.map(s => `
-    <div class="nd-rms-card" style="border-top:3px solid ${s.color};">
-      <div class="nd-rms-label">${s.label} RMS</div>
-      <div class="nd-rms-val" id="rms_${s.key}" style="color:${s.color};">--</div>
-      <div class="nd-rms-unit">${s.unit}</div>
-      <canvas id="rmsChart_${s.key}" height="60"></canvas>
-    </div>`).join('');
-  SENSOR_LIST.forEach(s => {
-    nodeDataCharts[`rms_${s.key}`] = new Chart(document.getElementById(`rmsChart_${s.key}`), {
-      type:'line', data:{labels:Array.from({length:20},(_,i)=>`${i}`), datasets:[{data:Array.from({length:20},()=>+(Math.random()*(s.max-s.min)*0.5+s.min).toFixed(2)), borderColor:s.color, backgroundColor:s.color+'22', tension:0.4, fill:true, pointRadius:0, borderWidth:2}]},
-      options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{y:{display:false},x:{display:false}}}
-    });
-  });
-}
-
-function renderWaterCards() {
-  const grid = document.getElementById('waterGrid');
-  if (!grid) return;
-  grid.innerHTML = SENSOR_LIST.map(s => `
-    <div class="nd-water-card">
-      <div class="nd-water-label" style="color:${s.color};">${s.label}</div>
-      <div class="nd-water-wrap">
-        <div class="nd-water-tank">
-          <div class="nd-water-fill" id="wf_${s.key}" style="height:50%;background:linear-gradient(180deg,${s.color},${s.color}88);"></div>
-          <div id="wb_${s.key}" style="position:absolute;inset:0;pointer-events:none;"></div>
-        </div>
-        <div class="nd-water-scale">
-          <span>${s.max}</span><span>${(s.max*0.75).toFixed(0)}</span><span>${(s.max*0.5).toFixed(0)}</span><span>${(s.max*0.25).toFixed(0)}</span><span>0</span>
-        </div>
-      </div>
-      <div class="nd-water-val" id="wv_${s.key}" style="color:${s.color};">-- ${s.unit}</div>
-    </div>`).join('');
-}
-
-function renderPtpCards() {
-  const grid = document.getElementById('ptpGrid');
-  if (!grid) return;
-  grid.innerHTML = SENSOR_LIST.map(s => `
-    <div class="nd-ptp-card" style="border-left:4px solid ${s.color};">
-      <div style="font-size:0.8rem;font-weight:700;color:${s.color};margin-bottom:8px;">${s.label}</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Peak</div><div class="nd-ptp-val" id="ptpMax_${s.key}" style="color:${s.color};">--</div></div>
-        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Trough</div><div class="nd-ptp-val" id="ptpMin_${s.key}" style="color:#64748b;">--</div></div>
-        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">P-P</div><div class="nd-ptp-val" id="ptpPP_${s.key}" style="color:#6366f1;">--</div></div>
-        <div class="nd-ptp-stat"><div class="nd-ptp-lbl">Unit</div><div class="nd-ptp-val" style="color:#64748b;">${s.unit}</div></div>
-      </div>
-      <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-        <div id="ptpBar_${s.key}" style="height:100%;background:${s.color};width:50%;border-radius:3px;transition:width 0.5s;"></div>
-      </div>
-    </div>`).join('');
-  setTimeout(() => {
-    if (nodeDataCharts.ptp) { try { nodeDataCharts.ptp.destroy(); } catch {} }
-    const el = document.getElementById('ptpChart');
-    if (!el) return;
-    nodeDataCharts.ptp = new Chart(el, {
-      type:'line',
-      data:{labels:Array.from({length:20},(_,i)=>`${i*5}min`), datasets:SENSOR_LIST.map(s=>({label:s.label, data:Array.from({length:20},()=>+(Math.random()*s.max*0.3).toFixed(2)), borderColor:s.color, backgroundColor:'transparent', tension:0.4, pointRadius:3, borderWidth:2}))},
-      options:{responsive:true, animation:false, plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{color:'#f1f5f9'}}}}
-    });
-  }, 100);
-}
-
-function updateLiveData() {
-  const rand = (min,max) => +(Math.random()*(max-min)+min).toFixed(2);
-  const vals = { temp:rand(55,95), vib:rand(1,15), press:rand(1,8), rpm:Math.floor(rand(800,2800)), mag:rand(10,80), ultra:rand(20,90) };
-  allNodeData.push({ ts:Date.now(), ...vals });
-  if (allNodeData.length > 500) allNodeData.shift();
-
-  SENSOR_LIST.forEach(s => {
-    const c = nodeDataCharts[s.key];
-    if (c) { c.data.datasets[0].data.shift(); c.data.datasets[0].data.push(vals[s.key]); c.update('none'); }
-  });
-
-  const lv = document.getElementById('liveValuesGrid');
-  if (lv) {
-    lv.innerHTML = SENSOR_LIST.map(s => {
-      const pct = ((vals[s.key]-s.min)/(s.max-s.min)*100).toFixed(1);
-      return `<div class="nd-live-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;margin-bottom:7px;">
-          <span style="font-weight:600;">${s.label}</span>
-          <strong style="color:${s.color}">${vals[s.key]} ${s.unit}</strong>
-        </div>
-        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-          <div style="width:${pct}%;height:100%;background:${s.color};border-radius:3px;transition:width 0.5s;"></div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (nodeDataCharts.spectrum) { nodeDataCharts.spectrum.data.datasets[0].data=Array.from({length:50},()=>+(Math.random()*10).toFixed(2)); nodeDataCharts.spectrum.update('none'); }
-  if (nodeDataCharts.ultra) { nodeDataCharts.ultra.data.datasets[0].data=Array.from({length:50},()=>+(Math.random()*8).toFixed(2)); nodeDataCharts.ultra.update('none'); }
-
-  SENSOR_LIST.forEach(s => {
-    const el = document.getElementById(`rms_${s.key}`);
-    if (el) el.textContent = vals[s.key];
-    const c = nodeDataCharts[`rms_${s.key}`];
-    if (c) { c.data.datasets[0].data.shift(); c.data.datasets[0].data.push(vals[s.key]); c.update('none'); }
-  });
-
-  SENSOR_LIST.forEach(s => {
-    const pct = ((vals[s.key]-s.min)/(s.max-s.min)*100);
-    const fill = document.getElementById(`wf_${s.key}`);
-    const valEl = document.getElementById(`wv_${s.key}`);
-    const bubble = document.getElementById(`wb_${s.key}`);
-    if (fill) fill.style.height = Math.min(95,Math.max(5,pct))+'%';
-    if (valEl) valEl.textContent = `${vals[s.key]} ${s.unit}`;
-    if (bubble) bubble.innerHTML = Array.from({length:3},()=>`<div style="position:absolute;bottom:0;left:${Math.random()*80+
+  list.forEach(s => { if (nodeDataCharts[s.key]) { try { nodeDataCharts[s.key].destroy(); } catch {} delete
