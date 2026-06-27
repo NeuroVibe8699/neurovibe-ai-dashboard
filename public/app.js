@@ -349,6 +349,8 @@ function openNodeData(nodeId) {
 
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) closeNodeData(); });
+
+  // ✅ FIX: Pehle spectrum tab temporarily visible karo, phir charts init karo
   initNodeDataCharts();
   startLiveData();
 }
@@ -361,11 +363,25 @@ function closeNodeData() {
   document.getElementById('nodeDataModal')?.remove();
 }
 
+// ✅ FIX: Tab switch hone par charts resize karo
 function switchDataTab(tab, btn) {
   document.querySelectorAll('.data-tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.data-tab').forEach(b => b.classList.remove('active'));
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   btn.classList.add('active');
+
+  setTimeout(() => {
+    if (tab === 'spectrum') {
+      nodeDataCharts.spectrum?.resize();
+      nodeDataCharts.ultra?.resize();
+    } else if (tab === 'rms') {
+      SENSOR_LIST.forEach(s => nodeDataCharts[`rms_${s.key}`]?.resize());
+    } else if (tab === 'ptp') {
+      nodeDataCharts.ptp?.resize();
+    } else if (tab === 'water') {
+      // water mein charts nahi hain, kuch nahi
+    }
+  }, 50);
 }
 
 function onSensorChange() { renderOverallCharts(); }
@@ -382,7 +398,21 @@ function startLiveData() {
 
 function initNodeDataCharts() {
   renderOverallCharts();
+
+  // ✅ FIX: Spectrum charts hidden tab mein bhi sahi initialize hon
+  const tabEl = document.getElementById('tab-spectrum');
+  if (tabEl) {
+    tabEl.style.display = 'block';
+    tabEl.style.visibility = 'hidden';
+    tabEl.style.position = 'absolute';
+  }
   renderSpectrumCharts();
+  if (tabEl) {
+    tabEl.style.display = '';
+    tabEl.style.visibility = '';
+    tabEl.style.position = '';
+  }
+
   renderRmsCards();
   renderWaterCards();
   renderPtpCards();
@@ -408,17 +438,63 @@ function renderOverallCharts() {
   });
 }
 
+// ✅ FIX: Ultrasound chart sahi se initialize hoga
 function renderSpectrumCharts() {
   const fl = Array.from({length:50},(_,i)=>`${i*10}Hz`);
-  if (nodeDataCharts.spectrum) { try { nodeDataCharts.spectrum.destroy(); } catch {} }
-  if (nodeDataCharts.ultra) { try { nodeDataCharts.ultra.destroy(); } catch {} }
-  nodeDataCharts.spectrum = new Chart(document.getElementById('spectrumChart'), {
-    type:'bar', data:{labels:fl, datasets:[{data:Array.from({length:50},()=>+(Math.random()*10).toFixed(2)), backgroundColor:'#6366f1aa', borderColor:'#6366f1', borderWidth:1}]},
-    options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}, x:{ticks:{maxTicksLimit:10}}}}
+
+  if (nodeDataCharts.spectrum) { try { nodeDataCharts.spectrum.destroy(); } catch {} delete nodeDataCharts.spectrum; }
+  if (nodeDataCharts.ultra) { try { nodeDataCharts.ultra.destroy(); } catch {} delete nodeDataCharts.ultra; }
+
+  const specEl = document.getElementById('spectrumChart');
+  const ultraEl = document.getElementById('ultraChart');
+  if (!specEl || !ultraEl) return;
+
+  nodeDataCharts.spectrum = new Chart(specEl, {
+    type:'bar',
+    data:{
+      labels: fl,
+      datasets:[{
+        label:'Vibration Spectrum (mm/s)',
+        data:Array.from({length:50},()=>+(Math.random()*10).toFixed(2)),
+        backgroundColor:'#6366f1aa',
+        borderColor:'#6366f1',
+        borderWidth:1
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true, grid:{color:'#f1f5f9'}},
+        x:{ticks:{maxTicksLimit:10}, grid:{display:false}}
+      }
+    }
   });
-  nodeDataCharts.ultra = new Chart(document.getElementById('ultraChart'), {
-    type:'bar', data:{labels:fl, datasets:[{data:Array.from({length:50},()=>+(Math.random()*8).toFixed(2)), backgroundColor:'#06b6d4aa', borderColor:'#06b6d4', borderWidth:1}]},
-    options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}, x:{ticks:{maxTicksLimit:10}}}}
+
+  nodeDataCharts.ultra = new Chart(ultraEl, {
+    type:'bar',
+    data:{
+      labels: fl,
+      datasets:[{
+        label:'Ultrasound Spectrum (dB)',
+        data:Array.from({length:50},()=>+(Math.random()*8).toFixed(2)),
+        backgroundColor:'#06b6d4aa',
+        borderColor:'#06b6d4',
+        borderWidth:1
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true, grid:{color:'#f1f5f9'}},
+        x:{ticks:{maxTicksLimit:10}, grid:{display:false}}
+      }
+    }
   });
 }
 
@@ -531,585 +607,4 @@ function updateLiveData() {
     const bubble = document.getElementById(`wb_${s.key}`);
     if (fill) fill.style.height = Math.min(95,Math.max(5,pct))+'%';
     if (valEl) valEl.textContent = `${vals[s.key]} ${s.unit}`;
-    if (bubble) bubble.innerHTML = Array.from({length:3},()=>`<div style="position:absolute;bottom:0;left:${Math.random()*80+10}%;width:${Math.random()*8+4}px;height:${Math.random()*8+4}px;border-radius:50%;background:rgba(255,255,255,0.5);animation:rise ${Math.random()*2+1}s linear infinite;"></div>`).join('');
-  });
-
-  const recent = allNodeData.slice(-20);
-  SENSOR_LIST.forEach(s => {
-    const arr = recent.map(d=>d[s.key]);
-    if (!arr.length) return;
-    const maxV=Math.max(...arr), minV=Math.min(...arr), pp=+(maxV-minV).toFixed(2);
-    const pct=(pp/s.max*100).toFixed(1);
-    const maxEl=document.getElementById(`ptpMax_${s.key}`);
-    const minEl=document.getElementById(`ptpMin_${s.key}`);
-    const ppEl=document.getElementById(`ptpPP_${s.key}`);
-    const barEl=document.getElementById(`ptpBar_${s.key}`);
-    if (maxEl) maxEl.textContent=maxV.toFixed(2);
-    if (minEl) minEl.textContent=minV.toFixed(2);
-    if (ppEl) ppEl.textContent=pp;
-    if (barEl) barEl.style.width=Math.min(100,pct)+'%';
-  });
-
-  if (nodeDataCharts.ptp) {
-    nodeDataCharts.ptp.data.datasets.forEach((ds,i) => {
-      const s=SENSOR_LIST[i];
-      const arr=recent.map(d=>d[s.key]);
-      if (!arr.length) return;
-      const pp=+(Math.max(...arr)-Math.min(...arr)).toFixed(2);
-      ds.data.shift(); ds.data.push(pp);
-    });
-    nodeDataCharts.ptp.update('none');
-  }
-}
-
-function downloadNodeData() {
-  const year=document.getElementById('dlYear').value;
-  const month=document.getElementById('dlMonth').value;
-  const sensor=document.getElementById('dlSensor').value;
-  const format=document.getElementById('dlFormat').value;
-  const node=currentNodeForData;
-  const list=sensor==='all'?SENSOR_LIST:SENSOR_LIST.filter(s=>s.key===sensor);
-  const data=allNodeData.length>0?allNodeData:Array.from({length:10},(_,i)=>({ts:Date.now()-i*60000,...Object.fromEntries(SENSOR_LIST.map(s=>[s.key,+(Math.random()*(s.max-s.min)+s.min).toFixed(2)]))}));
-  if (format==='csv') {
-    const headers=['Timestamp',...list.map(s=>`${s.label}(${s.unit})`)];
-    const rows=data.map(d=>[new Date(d.ts).toISOString(),...list.map(s=>d[s.key])]);
-    const csv=[headers,...rows].map(r=>r.join(',')).join('\n');
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-    a.download=`${node.serial_no}_${year}_${String(month).padStart(2,'0')}_${sensor}.csv`;
-    a.click();
-  } else {
-    const json=JSON.stringify({node:node.serial_no,model:node.model,year,month,sensor,data},null,2);
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
-    a.download=`${node.serial_no}_${year}_${String(month).padStart(2,'0')}_${sensor}.json`;
-    a.click();
-  }
-  toast(`✅ Downloaded: ${node.serial_no} ${year}-${String(month).padStart(2,'0')}`,'success');
-}
-
-// ===== CONGREGATION =====
-let congNode = null, congMotors = [];
-
-async function openCongregation(nodeId) {
-  congNode = nodes.find(n=>n.id===nodeId);
-  if (!congNode) return;
-  congMotors = await api(`/api/nodes/${nodeId}/motors`)||[];
-  document.getElementById('congTitle').textContent = `${congNode.model} - ${congNode.serial_no}`;
-  document.getElementById('congNodeInfo').innerHTML = `
-    <div class="node-icon" style="display:flex;align-items:center;justify-content:center;width:56px;height:56px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:14px;">${NODE_ICON_SVG}</div>
-    <div>
-      <h3 style="font-size:1rem;font-weight:700;">${congNode.model} — ${congNode.serial_no}</h3>
-      <p style="color:var(--muted);font-size:0.84rem;margin-top:5px;">
-        ${congNode.frequency} &nbsp;|&nbsp;
-        ${congNode.is_ai?'<span class="badge badge-ai">🤖 AI Model</span>':'<span class="badge badge-gray">Standard</span>'}
-        &nbsp;|&nbsp; Radio: <span class="mono">${congNode.radio_mac||'-'}</span>
-        &nbsp;|&nbsp; BLE: <span class="mono">${congNode.ble_mac||'-'}</span>
-      </p>
-    </div>`;
-  renderMotors();
-  showPage('congregation');
-}
-
-function renderMotors() {
-  const grid = document.getElementById('motorGrid');
-  if (congMotors.length === 0) {
-    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">⚙️<br>No motors assigned. Click "+ Add Motor".</div>';
-    return;
-  }
-  grid.innerHTML = congMotors.map(m => {
-    const health = m.health_score || 100;
-    const healthColor = health >= 75 ? '#28A745' : health >= 50 ? '#FFC107' : '#DC3545';
-    const healthLabel = health >= 75 ? '✅ Normal' : health >= 50 ? '⚠️ Warning' : '🔴 Critical';
-    return `
-    <div class="motor-card ${m.motor_name ? 'saved' : ''}">
-
-      <!-- HEALTH SCORE -->
-      <div class="motor-health-bar">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <h5 style="margin:0;">⚙️ ${m.motor_name || 'New Motor'}</h5>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:0.72rem;font-weight:700;color:${healthColor};">${healthLabel}</span>
-            <span class="health-score-badge" style="background:${healthColor};">${health}%</span>
-          </div>
-        </div>
-        <div class="health-track">
-          <div class="health-fill" style="width:${health}%;background:${healthColor};"></div>
-        </div>
-      </div>
-
-      <!-- SECTION: BASIC INFO -->
-      <div class="motor-section-title">📋 Asset Information</div>
-      <div class="matrix-row"><label>Asset ID</label><input id="mtag_${m.id}" value="${m.motor_tag||''}" placeholder="MTR-001" /></div>
-      <div class="matrix-row"><label>Motor Name</label><input id="mn_${m.id}" value="${m.motor_name||''}" placeholder="Cooling Tower Motor" /></div>
-      <div class="matrix-row"><label>Location</label><input id="ml_${m.id}" value="${m.location||''}" placeholder="Zone 1 - Floor A" /></div>
-      <div class="matrix-row"><label>Health Score</label>
-        <div style="display:flex;align-items:center;gap:8px;flex:1;">
-          <input type="range" id="mhealth_${m.id}" min="0" max="100" value="${health}"
-            oninput="document.getElementById('mhealthval_${m.id}').textContent=this.value+'%'"
-            style="flex:1;" />
-          <span id="mhealthval_${m.id}" style="font-weight:700;color:${healthColor};min-width:36px;">${health}%</span>
-        </div>
-      </div>
-
-      <!-- SECTION: MACHINE TYPE -->
-      <div class="motor-section-title">🏭 Machine Classification</div>
-      <div class="matrix-row"><label>Machine Type</label>
-        <select id="mtype_${m.id}">
-          ${['Pump','Motor','Compressor','Fan/Blower','Gearbox','Conveyor','Crusher','Turbine','Generator','Agitator','Centrifuge','Other'].map(t=>`<option ${(m.machine_type||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>Machine Make</label><input id="mmake_${m.id}" value="${m.machine_make||''}" placeholder="ABB, Siemens, WEG..." /></div>
-      <div class="matrix-row"><label>Machine Model</label><input id="mmodel_${m.id}" value="${m.machine_model||''}" placeholder="Model number" /></div>
-      <div class="matrix-row"><label>RPM Type</label>
-        <select id="mrpmtype_${m.id}">
-          ${['Constant','Variable'].map(t=>`<option ${(m.rpm_type||'Constant')===t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>Rotor Type</label>
-        <select id="mrotor_${m.id}">
-          ${['Squirrel Cage','Wound Rotor','Permanent Magnet','Other'].map(t=>`<option ${(m.rotor_type||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-
-      <!-- SECTION: ELECTRICAL -->
-      <div class="motor-section-title">⚡ Electrical Parameters</div>
-      <div class="matrix-row"><label>Power (kW)</label><input type="number" id="mp_${m.id}" value="${m.power_kw||''}" placeholder="7.5" /></div>
-      <div class="matrix-row"><label>Voltage (V)</label><input type="number" id="mv_${m.id}" value="${m.voltage||''}" placeholder="415" /></div>
-      <div class="matrix-row"><label>Current (A)</label><input type="number" id="mca_${m.id}" value="${m.current_a||''}" placeholder="14.2" /></div>
-      <div class="matrix-row"><label>Frequency (Hz)</label><input type="number" id="mfreq_${m.id}" value="${m.motor_freq||''}" placeholder="50" /></div>
-
-      <!-- SECTION: MECHANICAL -->
-      <div class="motor-section-title">🔧 Mechanical Parameters</div>
-      <div class="matrix-row"><label>Rated RPM</label><input type="number" id="mr_${m.id}" value="${m.rpm||''}" placeholder="1450" /></div>
-      <div class="matrix-row"><label>Coupling Type</label>
-        <select id="mcoupling_${m.id}">
-          ${['Direct','Belt','Gear','Flexible','Fluid','Chain','Other'].map(t=>`<option ${(m.coupling_type||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-
-      <!-- SECTION: BEARING DE -->
-      <div class="motor-section-title">🔵 Bearing — Drive End (DE)</div>
-      <div class="matrix-row"><label>DE Bearing No.</label><input id="mb_${m.id}" value="${m.bearing_type||''}" placeholder="6312-C3" /></div>
-      <div class="matrix-row"><label>DE Manufacturer</label>
-        <select id="mbdemake_${m.id}">
-          ${['SKF','FAG','NSK','NTN','Timken','INA','Other'].map(t=>`<option ${(m.bearing_de_make||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>DE Type</label>
-        <select id="mbdetype_${m.id}">
-          ${['Ball','Roller','Spherical','Tapered','Needle','Other'].map(t=>`<option ${(m.bearing_de_type||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-
-      <!-- SECTION: BEARING NDE -->
-      <div class="motor-section-title">🟢 Bearing — Non-Drive End (NDE)</div>
-      <div class="matrix-row"><label>NDE Bearing No.</label><input id="mbnde_${m.id}" value="${m.bearing_nde||''}" placeholder="6308-C3" /></div>
-      <div class="matrix-row"><label>NDE Manufacturer</label>
-        <select id="mbndemake_${m.id}">
-          ${['SKF','FAG','NSK','NTN','Timken','INA','Other'].map(t=>`<option ${(m.bearing_nde_make||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>NDE Type</label>
-        <select id="mbnde_type_${m.id}">
-          ${['Ball','Roller','Spherical','Tapered','Needle','Other'].map(t=>`<option ${(m.bearing_nde_type||'')=== t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-
-      <!-- SECTION: FAULT FREQUENCIES -->
-      <div class="motor-section-title">📊 Fault Frequencies (Vibration Analysis)</div>
-      <div class="fault-freq-info">These values are used for bearing fault detection in spectrum analysis</div>
-      <div class="matrix-row"><label>BPFI (Hz)</label><input type="number" step="0.01" id="mbpfi_${m.id}" value="${m.bpfi||''}" placeholder="Ball Pass Freq Inner" /></div>
-      <div class="matrix-row"><label>BPFO (Hz)</label><input type="number" step="0.01" id="mbpfo_${m.id}" value="${m.bpfo||''}" placeholder="Ball Pass Freq Outer" /></div>
-      <div class="matrix-row"><label>BSF (Hz)</label><input type="number" step="0.01" id="mbsf_${m.id}" value="${m.bsf||''}" placeholder="Ball Spin Frequency" /></div>
-
-      <!-- SECTION: SENSOR CONFIG -->
-      <div class="motor-section-title">📡 Sensor Configuration</div>
-      <div class="matrix-row"><label>Sensor Type</label>
-        <select id="ms_${m.id}">
-          ${['Vibration','Temperature','Vibration + Temperature','Ultrasound','Magnetic Flux','Pressure','RPM','All Sensors'].map(s=>`<option ${m.sensor_type===s?'selected':''}>${s}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>Alert Threshold</label><input id="ma_${m.id}" value="${m.alert_threshold||''}" placeholder="85°C / 10mm/s" /></div>
-
-      <!-- SECTION: DATA TIMING (Cloud Config) -->
-      <div class="motor-section-title">☁️ Data Collection Timing (Cloud Config)</div>
-      <div class="timing-info">⚡ Node will follow these settings — configured from cloud, no code change needed</div>
-      <div class="matrix-row"><label>Overall Active</label>
-        <select id="moverall_${m.id}" class="timing-select">
-          ${[
-            {l:'5 Minutes', v:'5min'},
-            {l:'15 Minutes',v:'15min'},
-            {l:'30 Minutes',v:'30min'},
-            {l:'1 Hour',    v:'1hr'},
-            {l:'2 Hours',   v:'2hr'},
-            {l:'4 Hours',   v:'4hr'},
-            {l:'6 Hours',   v:'6hr'},
-            {l:'8 Hours',   v:'8hr'},
-            {l:'12 Hours',  v:'12hr'},
-            {l:'16 Hours',  v:'16hr'},
-            {l:'18 Hours',  v:'18hr'},
-            {l:'24 Hours',  v:'24hr'},
-          ].map(o=>`<option value="${o.v}" ${(m.overall_time||'5min')===o.v?'selected':''}>${o.l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>Spectrum Active</label>
-        <select id="mspectrum_${m.id}" class="timing-select">
-          ${[
-            {l:'15 Minutes',v:'15min'},
-            {l:'30 Minutes',v:'30min'},
-            {l:'1 Hour',    v:'1hr'},
-            {l:'2 Hours',   v:'2hr'},
-            {l:'4 Hours',   v:'4hr'},
-            {l:'6 Hours',   v:'6hr'},
-            {l:'8 Hours',   v:'8hr'},
-            {l:'12 Hours',  v:'12hr'},
-            {l:'16 Hours',  v:'16hr'},
-            {l:'18 Hours',  v:'18hr'},
-            {l:'24 Hours',  v:'24hr'},
-          ].map(o=>`<option value="${o.v}" ${(m.spectrum_time||'15min')===o.v?'selected':''}>${o.l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="matrix-row"><label>Sleep After</label>
-        <select id="msleep_${m.id}" class="timing-select">
-          ${[
-            {l:'No Sleep',  v:'none'},
-            {l:'30 sec',    v:'30s'},
-            {l:'1 Minute',  v:'1min'},
-            {l:'5 Minutes', v:'5min'},
-            {l:'10 Minutes',v:'10min'},
-            {l:'30 Minutes',v:'30min'},
-            {l:'1 Hour',    v:'1hr'},
-          ].map(o=>`<option value="${o.v}" ${(m.sleep_after||'none')===o.v?'selected':''}>${o.l}</option>`).join('')}
-        </select>
-      </div>
-
-      <!-- CLOUD CONFIG PREVIEW -->
-      <div class="cloud-config-preview" id="ccprev_${m.id}">
-        <div class="ccp-title">☁️ Node Config Preview</div>
-        <div class="ccp-row"><span>Overall:</span><span id="ccov_${m.id}" class="ccp-val">5min</span></div>
-        <div class="ccp-row"><span>Spectrum:</span><span id="ccsp_${m.id}" class="ccp-val">15min</span></div>
-        <div class="ccp-row"><span>Sleep:</span><span id="ccsl_${m.id}" class="ccp-val">No Sleep</span></div>
-        <div class="ccp-row"><span>Status:</span><span class="ccp-val" style="color:#28A745;">✅ Synced to Node</span></div>
-      </div>
-
-      <!-- SECTION: NOTES -->
-      <div class="motor-section-title">📝 Maintenance Notes</div>
-      <div class="matrix-row" style="align-items:flex-start">
-        <label style="padding-top:4px">Notes</label>
-        <textarea id="mno_${m.id}" rows="3" placeholder="Maintenance history, observations...">${m.notes||''}</textarea>
-      </div>
-
-      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-success btn-sm" onclick="saveMotor(${m.id})">💾 Save Config</button>
-        <button class="btn btn-sm" style="background:#06b6d4;color:#fff;" onclick="previewCloudConfig(${m.id})">☁️ Preview</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMotor(${m.id})">🗑️ Remove</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Update cloud config previews
-  congMotors.forEach(m => updateCloudPreview(m.id));
-}
-
-function updateCloudPreview(id) {
-  const ov = document.getElementById(`moverall_${id}`)?.value || '5min';
-  const sp = document.getElementById(`mspectrum_${id}`)?.value || '15min';
-  const sl = document.getElementById(`msleep_${id}`)?.value || 'none';
-  const ovEl = document.getElementById(`ccov_${id}`);
-  const spEl = document.getElementById(`ccsp_${id}`);
-  const slEl = document.getElementById(`ccsl_${id}`);
-  if (ovEl) ovEl.textContent = ov;
-  if (spEl) spEl.textContent = sp;
-  if (slEl) slEl.textContent = sl === 'none' ? 'No Sleep' : sl;
-}
-
-function previewCloudConfig(id) {
-  updateCloudPreview(id);
-  toast('☁️ Config preview updated!', 'info');
-}
-
-async function addMotor() {
-  const res = await api(`/api/nodes/${congNode.id}/motors`,'POST',{motor_name:'',motor_tag:'',location:'',rpm:'',power_kw:'',voltage:'',current_a:'',bearing_type:'',sensor_type:'Vibration',alert_threshold:'',notes:''});
-  if (res&&res.id) { congMotors.push(res); renderMotors(); toast('Motor added!','success'); }
-}
-
-async function saveMotor(id) {
-  const body = {
-    motor_name:     document.getElementById(`mn_${id}`)?.value,
-    motor_tag:      document.getElementById(`mtag_${id}`)?.value,
-    location:       document.getElementById(`ml_${id}`)?.value,
-    machine_type:   document.getElementById(`mtype_${id}`)?.value,
-    machine_make:   document.getElementById(`mmake_${id}`)?.value,
-    machine_model:  document.getElementById(`mmodel_${id}`)?.value,
-    rpm_type:       document.getElementById(`mrpmtype_${id}`)?.value,
-    rotor_type:     document.getElementById(`mrotor_${id}`)?.value,
-    rpm:            document.getElementById(`mr_${id}`)?.value,
-    power_kw:       document.getElementById(`mp_${id}`)?.value,
-    voltage:        document.getElementById(`mv_${id}`)?.value,
-    current_a:      document.getElementById(`mca_${id}`)?.value,
-    motor_freq:     document.getElementById(`mfreq_${id}`)?.value,
-    coupling_type:  document.getElementById(`mcoupling_${id}`)?.value,
-    bearing_type:   document.getElementById(`mb_${id}`)?.value,
-    bearing_de_make:document.getElementById(`mbdemake_${id}`)?.value,
-    bearing_de_type:document.getElementById(`mbdetype_${id}`)?.value,
-    bearing_nde:    document.getElementById(`mbnde_${id}`)?.value,
-    bearing_nde_make:document.getElementById(`mbndemake_${id}`)?.value,
-    bearing_nde_type:document.getElementById(`mbnde_type_${id}`)?.value,
-    bpfi:           document.getElementById(`mbpfi_${id}`)?.value,
-    bpfo:           document.getElementById(`mbpfo_${id}`)?.value,
-    bsf:            document.getElementById(`mbsf_${id}`)?.value,
-    sensor_type:    document.getElementById(`ms_${id}`)?.value,
-    alert_threshold:document.getElementById(`ma_${id}`)?.value,
-    overall_time:   document.getElementById(`moverall_${id}`)?.value,
-    spectrum_time:  document.getElementById(`mspectrum_${id}`)?.value,
-    sleep_after:    document.getElementById(`msleep_${id}`)?.value,
-    health_score:   parseInt(document.getElementById(`mhealth_${id}`)?.value || 100),
-    notes:          document.getElementById(`mno_${id}`)?.value,
-  };
-  const res = await api(`/api/motors/${id}`, 'PUT', body);
-  if (res && res.id) {
-    const i = congMotors.findIndex(m => m.id === id);
-    if (i !== -1) congMotors[i] = res;
-    updateCloudPreview(id);
-    renderMotors();
-    toast('✅ Motor config saved & synced to cloud!', 'success');
-  }
-}
-
-
-async function deleteMotor(id) {
-  if (!confirm('Remove motor?')) return;
-  await api(`/api/motors/${id}`,'DELETE');
-  congMotors=congMotors.filter(m=>m.id!==id);
-  renderMotors(); toast('Removed','success');
-}
-
-// ===== SITES =====
-function renderSites() {
-  document.getElementById('sitesList').innerHTML = sites.length===0
-    ?'<div style="padding:20px;text-align:center;color:var(--muted);">No sites yet</div>'
-    :sites.map(s=>`<div class="site-item ${currentSite?.id===s.id?'active':''}" onclick="selectSite(${s.id})"><h4>🏭 ${s.name}</h4><p>${s.location||'No location'}</p></div>`).join('');
-}
-
-function selectSite(id) {
-  currentSite=sites.find(s=>s.id===id);
-  document.getElementById('mapTitle').textContent=`🗺️ ${currentSite.name}`;
-  document.getElementById('mapEmpty').style.display='none';
-  document.getElementById('mapToolbar').style.display='flex';
-  renderMap(); renderSites();
-}
-
-function renderMap() {
-  document.querySelectorAll('#mapCanvas .map-pin').forEach(p=>p.remove());
-  (currentSite.map_data||[]).forEach(pin=>addPinToMap(pin));
-}
-
-function addPinToMap(pin) {
-  const canvas=document.getElementById('mapCanvas');
-  const el=document.createElement('div');
-  el.className='map-pin';
-  el.style.left=pin.x+'%'; el.style.top=pin.y+'%';
-  el.dataset.pinId=pin.id;
-  el.innerHTML=`
-    <div class="pin-marker ${pin.type}" title="${pin.label}">
-      ${pin.type==='gw'?'📡':NODE_ICON_SVG}
-    </div>
-    <div class="pin-label">${pin.label}</div>
-    <div class="pin-actions">
-      ${pin.type==='nd'?`<span class="pin-btn config-btn" onclick="openPinConfig(${pin.nodeId})">⚙️</span>`:''}
-      ${pin.type==='nd'?`<span class="pin-btn move-btn" onclick="startMovePin(${pin.id})">✋</span>`:''}
-      ${pin.type==='nd'?`<span class="pin-btn data-btn" onclick="openNodeData(${pin.nodeId})">📊</span>`:''}
-      ${pin.type==='gw'?`<span class="pin-btn gw-btn" onclick="showGatewayNodes(${pin.gatewayId})">👁️</span>`:''}
-      <span class="pin-btn del-btn" onclick="deletePin(${pin.id})">🗑️</span>
-    </div>`;
-  if (pin.type==='nd') {
-    el.querySelector('.pin-marker').addEventListener('click',e=>{e.stopPropagation();if(movingPinId)return;openPinConfig(pin.nodeId);});
-  }
-  if (pin.type==='gw') {
-    el.querySelector('.pin-marker').addEventListener('click',e=>{e.stopPropagation();showGatewayNodes(pin.gatewayId);});
-  }
-  canvas.appendChild(el);
-}
-
-function startMovePin(pinId) {
-  movingPinId=pinId;
-  toast('✋ Map pe click karo jahan move karna hai','info');
-  document.getElementById('mapCanvas').style.cursor='crosshair';
-  document.querySelectorAll('.map-pin').forEach(el=>{
-    if(parseInt(el.dataset.pinId)===pinId){el.style.opacity='0.5';el.style.outline='2px dashed #6366f1';el.style.borderRadius='8px';}
-  });
-}
-
-function deletePin(pinId) {
-  currentSite.map_data=(currentSite.map_data||[]).filter(p=>p.id!==pinId);
-  document.querySelector(`[data-pin-id="${pinId}"]`)?.remove();
-  toast('Pin deleted','success');
-}
-
-function openPinConfig(nodeId) {
-  if(!nodeId){toast('Node linked nahi hai','warning');return;}
-  const node=nodes.find(n=>n.id===parseInt(nodeId));
-  if(!node){toast('Node nahi mila!','error');return;}
-  openCongregation(node.id);
-}
-
-function showGatewayNodes(gatewayId) {
-  if(!gatewayId){toast('Gateway linked nahi hai','warning');return;}
-  const gw=gateways.find(g=>g.id===parseInt(gatewayId));
-  const gwNodes=nodes.filter(n=>n.gateway_id===parseInt(gatewayId));
-  document.getElementById('gwPopup')?.remove();
-  const popup=document.createElement('div');
-  popup.id='gwPopup'; popup.className='gw-popup';
-  popup.innerHTML=`
-    <div class="gw-popup-header">
-      <h4>📡 ${gw?gw.model:'Gateway'} — ${gw?gw.serial_no:''}</h4>
-      <button onclick="document.getElementById('gwPopup').remove()">✕</button>
-    </div>
-    <div class="gw-popup-body">
-      ${gwNodes.length===0?'<p style="color:var(--muted);text-align:center;padding:20px;">No nodes linked</p>'
-        :gwNodes.map(n=>`<div class="gw-node-item" onclick="openCongregation(${n.id})">
-          <span class="badge badge-purple">${n.model}</span>
-          <span class="mono">${n.serial_no}</span>
-          ${n.is_ai?'<span class="badge badge-ai">🤖 AI</span>':''}
-          <span class="badge ${n.status==='active'?'badge-green':'badge-red'}">${n.status}</span>
-          <span class="pin-btn config-btn">⚙️</span>
-        </div>`).join('')}
-    </div>`;
-  document.body.appendChild(popup);
-}
-
-function addPin(type) {
-  addingPin=type;
-  toast(`Click map to place ${type==='gateway'?'📡 Gateway':'🔌 Node'} pin`,'info');
-}
-
-document.getElementById('mapCanvas').addEventListener('click', e=>{
-  const rect=e.currentTarget.getBoundingClientRect();
-  const x=((e.clientX-rect.left)/rect.width*100).toFixed(1);
-  const y=((e.clientY-rect.top)/rect.height*100).toFixed(1);
-  if(movingPinId){
-    const pinEl=document.querySelector(`[data-pin-id="${movingPinId}"]`);
-    if(pinEl){pinEl.style.left=x+'%';pinEl.style.top=y+'%';pinEl.style.opacity='1';pinEl.style.outline='none';}
-    const p=currentSite.map_data.find(p=>p.id===movingPinId);
-    if(p){p.x=x;p.y=y;}
-    movingPinId=null;
-    document.getElementById('mapCanvas').style.cursor='crosshair';
-    toast('Pin moved! 💾 Save karo.','success');
-    return;
-  }
-  if(!addingPin||!currentSite) return;
-  const label=prompt('Label:',addingPin==='gateway'?'GW-01':'ND-01');
-  if(!label){addingPin=null;return;}
-  let nodeId=null,gatewayId=null;
-  if(addingPin==='node'&&nodes.length>0){
-    const sel=nodes.map((n,i)=>`${i+1}. ${n.model} - ${n.serial_no}`).join('\n');
-    const choice=prompt(`Konsa node?\n\n${sel}\n\nNumber daalo:`);
-    const idx=parseInt(choice)-1;
-    if(idx>=0&&nodes[idx]) nodeId=nodes[idx].id;
-  }
-  if(addingPin==='gateway'&&gateways.length>0){
-    const sel=gateways.map((g,i)=>`${i+1}. ${g.model} - ${g.serial_no}`).join('\n');
-    const choice=prompt(`Konsa gateway?\n\n${sel}\n\nNumber daalo:`);
-    const idx=parseInt(choice)-1;
-    if(idx>=0&&gateways[idx]) gatewayId=gateways[idx].id;
-  }
-  const pin={id:Date.now(),type:addingPin==='gateway'?'gw':'nd',x,y,label,nodeId,gatewayId};
-  if(!currentSite.map_data) currentSite.map_data=[];
-  currentSite.map_data.push(pin);
-  addPinToMap(pin);
-  addingPin=null;
-});
-
-async function saveMap() {
-  if(!currentSite) return;
-  await api(`/api/sites/${currentSite.id}/map`,'PUT',{map_data:currentSite.map_data});
-  toast('Map saved! ✅','success');
-}
-
-async function submitSite(e) {
-  e.preventDefault();
-  const body={name:document.getElementById('siteName').value,location:document.getElementById('siteLocation').value,description:document.getElementById('siteDesc').value};
-  const res=await api('/api/sites','POST',body);
-  if(res&&res.id){sites.unshift(res);closeModal('siteModal');e.target.reset();renderSites();toast('Site added!','success');}
-}
-
-// ===== USERS =====
-async function loadUsers() {
-  const users=await api('/api/users')||[];
-  document.getElementById('userBody').innerHTML=users.map(u=>`
-    <tr>
-      <td><strong>${u.name}</strong></td>
-      <td>${u.email}</td>
-      <td><span class="badge ${u.role==='admin'?'badge-purple':'badge-gray'}">${u.role}</span></td>
-      <td style="font-size:0.78rem;color:var(--muted);">${new Date(u.created_at).toLocaleDateString('en-IN')}</td>
-      <td>${u.email!=='admin@neurovibe.ai'?`<button class="btn-icon" onclick="deleteUser(${u.id})">🗑️</button>`:'-'}</td>
-    </tr>`).join('');
-}
-
-async function submitUser(e) {
-  e.preventDefault();
-  const body={name:document.getElementById('uName').value,email:document.getElementById('uEmail').value,password:document.getElementById('uPassword').value,role:document.getElementById('uRole').value};
-  const res=await api('/api/users','POST',body);
-  if(res&&res.id){closeModal('userModal');e.target.reset();loadUsers();toast('User created!','success');}
-  else toast(res?.error||'Error','error');
-}
-
-async function deleteUser(id) {
-  if(!confirm('Delete user?')) return;
-  await api(`/api/users/${id}`,'DELETE');
-  loadUsers(); toast('Deleted','success');
-}
-
-// ===== IMPORT/EXPORT =====
-async function importCSV(type,input) {
-  const file=input.files[0]; if(!file) return;
-  const text=await file.text();
-  const lines=text.split('\n').filter(l=>l.trim());
-  const headers=lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
-  const rows=lines.slice(1).map(line=>{
-    const vals=line.split(',').map(v=>v.replace(/"/g,'').trim());
-    const obj={}; headers.forEach((h,i)=>obj[h]=vals[i]||'');
-    return type==='gateways'
-      ?{model:obj['Model'],serial_no:obj['Serial No'],imei:obj['IMEI'],radio_mac:obj['Radio MAC'],lan_mac:obj['LAN MAC'],wan_mac:obj['WAN MAC'],ble_mac:obj['BLE MAC'],frequency:obj['Frequency']}
-      :{model:obj['Model'],serial_no:obj['Serial No'],radio_mac:obj['Radio MAC'],ble_mac:obj['BLE MAC'],frequency:obj['Frequency'],is_ai:obj['AI Model']};
-  });
-  const res=await api(`/api/import/${type}`,'POST',{rows});
-  toast(`${res?.imported||0} ${type} imported!`,'success');
-  await loadAll();
-  if(type==='gateways') renderGateways(); else renderNodes();
-}
-
-function exportCSV(type) {
-  let headers,rows;
-  if(type==='gateways'){headers=['Model','Serial No','IMEI','Radio MAC','LAN MAC','WAN MAC','BLE MAC','Frequency','Site'];rows=gateways.map(g=>[g.model,g.serial_no,g.imei,g.radio_mac,g.lan_mac,g.wan_mac,g.ble_mac,g.frequency,g.site]);}
-  else{headers=['Model','Serial No','Radio MAC','BLE MAC','Frequency','AI Model','Site'];rows=nodes.map(n=>[n.model,n.serial_no,n.radio_mac,n.ble_mac,n.frequency,n.is_ai?'Yes':'No',n.site]);}
-  const csv=[headers,...rows].map(r=>r.map(c=>`"${c||''}"`).join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`neurovibe_${type}_${Date.now()}.csv`;
-  a.click(); toast(`${type} exported!`,'success');
-}
-
-function filterTable(tableId,query) {
-  const q=query.toLowerCase();
-  document.querySelectorAll(`#${tableId} tbody tr`).forEach(row=>{
-    row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
-  });
-}
-
-function openModal(id){document.getElementById(id).style.display='flex';}
-function closeModal(id){document.getElementById(id).style.display='none';}
-document.querySelectorAll('.modal-overlay').forEach(el=>{
-  el.addEventListener('click',e=>{if(e.target===el) el.style.display='none';});
-});
-
-function toast(msg,type='info'){
-  const c=document.getElementById('toastContainer');
-  const t=document.createElement('div');
-  t.className=`toast ${type}`;
-  const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
-  t.innerHTML=`${icons[type]||'ℹ️'} ${msg}`;
-  c.appendChild(t);
-  setTimeout(()=>t.remove(),3500);
-}
+    if (bubble) bubble.innerHTML = Array.from({length:3},()=>`<div style="position:absolute;bottom:0;left:${Math.random()*80+
