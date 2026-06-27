@@ -1074,3 +1074,22 @@ function toast(msg,type='info'){
   c.appendChild(t);
   setTimeout(()=>t.remove(),3500);
 }
+// ... (previous code)
+async function renderDashboard() {
+  const stats = await api('/api/dashboard/stats') || {};
+  const cards = [
+    { icon:'📡', label:'Gateways',  value:stats.gateways||0,  sub:'Total registered', g:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
+    { icon:'🔌', label:'Nodes',     value:stats.nodes||0,     sub:`${stats.ai_nodes||0} AI-enabled`, g:'linear-gradient(90deg,#10b981,#059669)' },
+    { icon:'🗺️', label:'Sites',     value:stats.sites||0,     sub:'Plant locations', g:'linear-gradient(90deg,#f59e0b,#d97706)' },
+    { icon:'👥', label:'Users',     value:stats.users||0,     sub:'Platform users', g:'linear-gradient(90deg,#06b6d4,#0891b2)' },
+    { icon:'🤖', label:'AI Nodes',  value:stats.ai_nodes||0,  sub:'AI-enabled devices', g:'linear-gradient(90deg,#8b5cf6,#ec4899)' }
+  ];
+  // Logic to render these cards to the DOM...
+}
+
+// You MUST define these missing functions or the app will crash after login:
+function updateCharts() { /* code */ }
+function renderGateways() { /* code */ }
+function renderNodes() { /* code */ }
+function renderSites() { /* code */ }
+function loadUsers() { /* code */ }
