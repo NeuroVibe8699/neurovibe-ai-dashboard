@@ -146,7 +146,6 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
 
-  // Demo login - backend ke bina kaam karega
   if (email === 'admin@neurovibe.ai' && password === 'admin@123') {
     token = 'demo-token';
     currentUser = { name:'Admin', role:'admin', email:'admin@neurovibe.ai' };
@@ -156,23 +155,9 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     return;
   }
 
-  // Real backend login
-  try {
-    const res = await fetch(`${API}/api/auth/login`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    token = data.token; currentUser = data.user;
-    localStorage.setItem('nv_token', token);
-    localStorage.setItem('nv_user', JSON.stringify(currentUser));
-    showApp();
-  } catch (err) {
-    const el = document.getElementById('loginError');
-    el.textContent = 'Invalid email or password';
-    el.style.display = 'block';
-  }
+  const el = document.getElementById('loginError');
+  el.textContent = 'Invalid email or password';
+  el.style.display = 'block';
 });
 
 function logout() {
