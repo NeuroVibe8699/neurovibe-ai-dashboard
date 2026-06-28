@@ -2,11 +2,11 @@ const API = '';
 let token = localStorage.getItem('nv_token');
 let currentUser = JSON.parse(localStorage.getItem('nv_user') || 'null');
 let gateways = [], nodes = [], sites = [], currentSite = null, addingPin = null, movingPinId = null;
-let sensorChart
-, deviceChart, tempChart, freqChart;
+let sensorChart, deviceChart, tempChart, freqChart;
 let nodeDataCharts = {}, nodeDataInterval = null, currentNodeForData = null, allNodeData = [];
 
 const NODE_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="4" fill="#6366f1"/><rect x="6" y="6" width="4" height="6" rx="1" fill="white"/><rect x="14" y="6" width="4" height="6" rx="1" fill="white"/><rect x="6" y="15" width="12" height="3" rx="1" fill="white"/><rect x="9" y="18" width="2" height="4" fill="#6366f1"/><rect x="13" y="18" width="2" height="4" fill="#6366f1"/></svg>`;
+
 const SENSOR_LIST = [
   { key:'temp',  label:'Temperature',   unit:'°C',   color:'#ef4444', min:0, max:100  },
   { key:'vib',   label:'Vibration',     unit:'mm/s', color:'#6366f1', min:0, max:20   },
@@ -27,6 +27,7 @@ const INTERVAL_OPTIONS = [
   { label:'12 Hours',   ms:43200000 },
   { label:'24 Hours',   ms:86400000 },
 ];
+
 let _demoGateways = [];
 let _demoNodes = [];
 let _demoSites = [];
@@ -38,16 +39,12 @@ let _demoIdCounter = 100;
 
 function demoApi(url, method, body) {
   const newId = () => ++_demoIdCounter;
-
   if (url === '/api/dashboard/stats') return Promise.resolve({
-    gateways: _demoGateways.length,
-    nodes: _demoNodes.length,
-    sites: _demoSites.length,
-    users: _demoUsers.length,
+    gateways: _demoGateways.length, nodes: _demoNodes.length,
+    sites: _demoSites.length, users: _demoUsers.length,
     ai_nodes: _demoNodes.filter(n=>n.is_ai).length,
     motors: Object.values(_demoMotors).flat().length
   });
-
   if (url === '/api/gateways' && method === 'GET') return Promise.resolve([..._demoGateways]);
   if (url === '/api/gateways' && method === 'POST') {
     const gw = { id:newId(), ...body, status:'active' };
@@ -58,7 +55,6 @@ function demoApi(url, method, body) {
     _demoGateways = _demoGateways.filter(g=>g.id!==gid);
     return Promise.resolve({});
   }
-
   if (url === '/api/nodes' && method === 'GET') return Promise.resolve([..._demoNodes]);
   if (url === '/api/nodes' && method === 'POST') {
     const gw = _demoGateways.find(g=>g.id===parseInt(body.gateway_id));
@@ -80,14 +76,12 @@ function demoApi(url, method, body) {
     _demoNodes = _demoNodes.filter(n=>n.id!==nid);
     return Promise.resolve({});
   }
-
   if (url.match(/\/api\/motors\/\d+/) && method === 'PUT') {
     const mid = parseInt(url.split('/')[3]);
     for (const nid in _demoMotors) {
       const idx = _demoMotors[nid].findIndex(m=>m.id===mid);
       if (idx !== -1) {
         _demoMotors[nid][idx] = { ..._demoMotors[nid][idx], ...body, id:mid };
-        
         return Promise.resolve(_demoMotors[nid][idx]);
       }
     }
@@ -95,12 +89,9 @@ function demoApi(url, method, body) {
   }
   if (url.match(/\/api\/motors\/\d+/) && method === 'DELETE') {
     const mid = parseInt(url.split('/')[3]);
-    for (const nid in _demoMotors) {
-      _demoMotors[nid] = _demoMotors[nid].filter(m=>m.id!==mid);
-    }
+    for (const nid in _demoMotors) _demoMotors[nid] = _demoMotors[nid].filter(m=>m.id!==mid);
     return Promise.resolve({});
   }
-
   if (url === '/api/sites' && method === 'GET') return Promise.resolve([..._demoSites]);
   if (url === '/api/sites' && method === 'POST') {
     const site = { id:newId(), ...body, map_data:[] };
@@ -112,7 +103,6 @@ function demoApi(url, method, body) {
     if (site) site.map_data = body.map_data;
     return Promise.resolve({});
   }
-
   if (url === '/api/users' && method === 'GET') return Promise.resolve([..._demoUsers]);
   if (url === '/api/users' && method === 'POST') {
     const user = { id:newId(), ...body, created_at: new Date().toISOString() };
@@ -123,7 +113,6 @@ function demoApi(url, method, body) {
     _demoUsers = _demoUsers.filter(u=>u.id!==uid);
     return Promise.resolve({});
   }
-
   if (url.match(/\/api\/import\//) && method === 'POST') {
     const type = url.split('/')[3];
     if (type === 'gateways') {
@@ -133,7 +122,6 @@ function demoApi(url, method, body) {
     }
     return Promise.resolve({ imported: body.rows.length });
   }
-
   return Promise.resolve(null);
 }
 
@@ -161,8 +149,7 @@ document.getElementById('loginForm').addEventListener('submit', e => {
 });
 
 function logout() {
-  localStorage.removeItem('nv_token');
-  localStorage.removeItem('nv_user');
+  localStorage.removeItem('nv_token'); localStorage.removeItem('nv_user');
   token = null; currentUser = null;
   document.getElementById('appPage').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
@@ -278,7 +265,7 @@ function updateCharts() {
 
 function renderGateways() {
   document.getElementById('gwBody').innerHTML = gateways.length === 0
-    ? '<tr><td colspan="11" style="text-align:center;padding:40px;color:#64748b;">No gateways yet.</td></tr>'
+    ? '<tr><td colspan="12" style="text-align:center;padding:40px;color:#64748b;">No gateways yet.</td></tr>'
     : gateways.map(g => `<tr>
         <td><span class="badge badge-blue">${g.model}</span></td>
         <td class="mono">${g.serial_no}</td>
@@ -290,6 +277,7 @@ function renderGateways() {
         <td><span class="badge badge-gray">${g.frequency||'-'}</span></td>
         <td>${g.site||'-'}</td>
         <td><span class="badge ${g.status==='active'?'badge-green':'badge-red'}">${g.status||'active'}</span></td>
+        <td><button class="btn btn-sm btn-outline" onclick="openGatewayConfig(${g.id})">⚙️ Config</button></td>
         <td><button class="btn-icon" onclick="deleteGateway(${g.id})">🗑️</button></td>
       </tr>`).join('');
 }
@@ -345,6 +333,231 @@ async function deleteNode(id) {
   await api(`/api/nodes/${id}`,'DELETE');
   nodes = nodes.filter(n=>n.id!==id);
   renderNodes(); toast('Deleted','success');
+}
+function openGatewayConfig(gwId) {
+  const gw = gateways.find(g => g.id === gwId);
+  if (!gw) return;
+  document.getElementById('gwConfigModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'gwConfigModal';
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:620px;width:96%;max-height:92vh;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;border-radius:16px 16px 0 0;padding:16px 24px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:1.8rem;">📡</div>
+          <div>
+            <h3 style="color:#fff;font-size:1rem;margin:0;">Gateway Config — ${gw.model}</h3>
+            <p style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin:2px 0 0;">${gw.serial_no}</p>
+          </div>
+        </div>
+        <button class="modal-close" style="color:#fff;background:rgba(255,255,255,0.1);" onclick="document.getElementById('gwConfigModal').remove()">✕</button>
+      </div>
+      <div style="padding:20px;overflow-y:auto;max-height:78vh;">
+
+        <!-- STATUS BAR -->
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:10px;padding:14px 18px;margin-bottom:16px;border:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div id="gwStatusDot" style="width:12px;height:12px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></div>
+            <span style="font-weight:700;font-size:0.9rem;" id="gwStatusText">🟢 Online</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--muted);">
+            <span>📶 Signal: <strong style="color:#6366f1;">-72 dBm</strong></span>
+            <span>⏱️ Uptime: <strong style="color:#10b981;">2d 4h</strong></span>
+            <span>🕐 Last seen: <strong>Just now</strong></span>
+          </div>
+        </div>
+
+        <!-- NETWORK CONFIG -->
+        <div class="motor-section-title">🌐 Network Configuration</div>
+        <div class="matrix-row">
+          <label>Connection Type</label>
+          <select id="gwNetType" onchange="toggleGwNetworkFields()" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;">
+            <option value="wifi">📶 WiFi</option>
+            <option value="ethernet">🔌 Ethernet</option>
+            <option value="4g">📱 4G/LTE</option>
+            <option value="5g">🚀 5G</option>
+          </select>
+        </div>
+        <div id="gwWifiFields">
+          <div class="matrix-row">
+            <label>WiFi SSID</label>
+            <input id="gwSSID" placeholder="Network Name" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+          <div class="matrix-row">
+            <label>WiFi Password</label>
+            <input type="password" id="gwWifiPass" placeholder="••••••••" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+        </div>
+        <div class="matrix-row">
+          <label>IP Mode</label>
+          <select id="gwIPMode" onchange="toggleGwIPFields()" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;">
+            <option value="dhcp">🔄 DHCP (Auto)</option>
+            <option value="static">📌 Static IP</option>
+          </select>
+        </div>
+        <div id="gwStaticIPFields" style="display:none;">
+          <div class="matrix-row">
+            <label>IP Address</label>
+            <input id="gwStaticIP" placeholder="192.168.1.100" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+          <div class="matrix-row">
+            <label>Subnet Mask</label>
+            <input id="gwSubnet" placeholder="255.255.255.0" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+          <div class="matrix-row">
+            <label>Gateway IP</label>
+            <input id="gwGatewayIP" placeholder="192.168.1.1" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+          <div class="matrix-row">
+            <label>DNS Server</label>
+            <input id="gwDNS" placeholder="8.8.8.8" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          </div>
+        </div>
+
+        <!-- APN CONFIG -->
+        <div class="motor-section-title">📶 APN Configuration (4G/5G)</div>
+        <div class="matrix-row">
+          <label>APN Name</label>
+          <input id="gwAPN" placeholder="airtelgprs.com" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+        </div>
+        <div class="matrix-row">
+          <label>APN Username</label>
+          <input id="gwAPNUser" placeholder="Username (optional)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+        </div>
+        <div class="matrix-row">
+          <label>APN Password</label>
+          <input type="password" id="gwAPNPass" placeholder="Password (optional)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+        </div>
+        <div class="matrix-row">
+          <label>SIM Slot</label>
+          <select id="gwSIMSlot" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;">
+            <option value="sim1">SIM 1</option>
+            <option value="sim2">SIM 2</option>
+          </select>
+        </div>
+
+        <!-- GATEWAY OTA -->
+        <div class="motor-section-title">🔄 Gateway OTA Firmware Update</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:0.78rem;font-weight:700;color:#16a34a;">Current Version</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#15803d;">v2.4.1</div>
+          </div>
+          <div style="font-size:1.5rem;">→</div>
+          <div style="text-align:right;">
+            <div style="font-size:0.78rem;font-weight:700;color:#6366f1;">Latest Available</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#4f46e5;">v2.5.0</div>
+          </div>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:0.78rem;color:#92400e;">
+          ⚠️ OTA update ke dauran gateway 2-3 minute offline rahega. Connected nodes temporarily disconnect honge.
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button class="btn btn-sm btn-outline" style="flex:1;" onclick="checkGwOTA()">🔍 Check Update</button>
+          <button class="btn btn-sm btn-success" style="flex:1;" onclick="startGwOTA()">⬆️ Update Gateway</button>
+        </div>
+        <div id="gwOtaProgress" style="display:none;margin-bottom:14px;">
+          <div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;" id="gwOtaText">Downloading...</div>
+          <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+            <div id="gwOtaBar" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);width:0%;border-radius:4px;transition:width 0.5s;"></div>
+          </div>
+        </div>
+
+        <!-- NODE OTA -->
+        <div class="motor-section-title">📡 Connected Nodes OTA Update</div>
+        <div id="gwNodeOtaList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+          ${nodes.filter(n=>n.gateway_id===gwId).length === 0
+            ? '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.82rem;background:#f8fafc;border-radius:8px;">No nodes connected to this gateway</div>'
+            : nodes.filter(n=>n.gateway_id===gwId).map(n=>`
+              <div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
+                  <span class="badge badge-purple">${n.model}</span>
+                  <span class="mono" style="font-size:0.75rem;">${n.serial_no}</span>
+                  ${n.is_ai?'<span class="badge badge-ai">🤖</span>':''}
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:0.72rem;color:var(--muted);">v1.2.3</span>
+                  <button class="btn btn-sm" style="background:#f59e0b;color:#fff;padding:3px 10px;font-size:0.72rem;" onclick="updateSingleNode(${n.id},'${n.model}')">⬆️ Update</button>
+                </div>
+              </div>`).join('')}
+        </div>
+        ${nodes.filter(n=>n.gateway_id===gwId).length > 0 ? `
+        <button class="btn btn-sm btn-success" style="width:100%;margin-bottom:14px;" onclick="updateAllGwNodes(${gwId})">⬆️ Update All Connected Nodes</button>` : ''}
+
+        <!-- SAVE -->
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="saveGwConfig(${gwId})">💾 Save Config</button>
+          <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('gwConfigModal').remove()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+function toggleGwNetworkFields() {
+  const type = document.getElementById('gwNetType')?.value;
+  const wifiFields = document.getElementById('gwWifiFields');
+  if (wifiFields) wifiFields.style.display = (type === 'wifi') ? 'block' : 'none';
+}
+
+function toggleGwIPFields() {
+  const mode = document.getElementById('gwIPMode')?.value;
+  const staticFields = document.getElementById('gwStaticIPFields');
+  if (staticFields) staticFields.style.display = (mode === 'static') ? 'block' : 'none';
+}
+
+function checkGwOTA() {
+  toast('🔍 Checking for firmware updates...', 'info');
+  setTimeout(() => toast('✅ New firmware v2.5.0 available!', 'success'), 2000);
+}
+
+function startGwOTA() {
+  if (!confirm('Gateway OTA update shuru karna chahte ho? 2-3 min offline rahega.')) return;
+  const progress = document.getElementById('gwOtaProgress');
+  const bar = document.getElementById('gwOtaBar');
+  const text = document.getElementById('gwOtaText');
+  if (progress) progress.style.display = 'block';
+  const steps = [
+    {p:15, t:'📥 Downloading firmware v2.5.0...'},
+    {p:40, t:'✅ Download complete. Verifying checksum...'},
+    {p:65, t:'🔄 Installing firmware...'},
+    {p:85, t:'🔁 Rebooting gateway...'},
+    {p:100, t:'✅ Update complete! Running v2.5.0'},
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= steps.length) {
+      clearInterval(iv);
+      toast('✅ Gateway updated to v2.5.0!', 'success');
+      return;
+    }
+    if (bar) bar.style.width = steps[i].p + '%';
+    if (text) text.textContent = steps[i].t;
+    i++;
+  }, 1500);
+}
+
+function updateSingleNode(nodeId, model) {
+  toast(`⬆️ Updating ${model}...`, 'info');
+  setTimeout(() => toast(`✅ ${model} updated successfully!`, 'success'), 3000);
+}
+
+function updateAllGwNodes(gwId) {
+  const gwNodes = nodes.filter(n => n.gateway_id === gwId);
+  if (!gwNodes.length) return;
+  toast(`⬆️ Updating ${gwNodes.length} nodes...`, 'info');
+  setTimeout(() => toast(`✅ All ${gwNodes.length} nodes updated!`, 'success'), 4000);
+}
+
+function saveGwConfig(gwId) {
+  toast('✅ Gateway config saved & synced!', 'success');
+  document.getElementById('gwConfigModal')?.remove();
 }
 function openNodeData(nodeId) {
   currentNodeForData = nodes.find(n => n.id === nodeId);
@@ -522,6 +735,7 @@ function renderSpectrumCharts() {
     options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{ticks:{maxTicksLimit:10},grid:{display:false}}}}
   });
 }
+
 function renderRmsCards() {
   const grid = document.getElementById('rmsGrid');
   if (!grid) return;
@@ -586,7 +800,6 @@ function renderPtpCards() {
     });
   }, 100);
 }
-
 function updateLiveData() {
   const rand = (min,max) => +(Math.random()*(max-min)+min).toFixed(2);
   const vals = { temp:rand(55,95), vib:rand(1,15), press:rand(1,8), rpm:Math.floor(rand(800,2800)), mag:rand(10,80), ultra:rand(20,90) };
@@ -687,6 +900,7 @@ function downloadNodeData() {
   }
   toast(`✅ Downloaded: ${node.serial_no} ${year}-${String(month).padStart(2,'0')}`,'success');
 }
+
 let congNode = null, congMotors = [];
 
 async function openCongregation(nodeId) {
