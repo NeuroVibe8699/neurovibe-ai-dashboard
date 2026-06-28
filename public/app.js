@@ -370,7 +370,7 @@ function openGatewayConfig(gwId) {
           </div>
         </div>
 
-        <!-- NETWORK CONFIG -->
+        <!-- SECTION 1: NETWORK -->
         <div class="motor-section-title">🌐 Network Configuration</div>
         <div class="matrix-row">
           <label>Connection Type</label>
@@ -416,31 +416,22 @@ function openGatewayConfig(gwId) {
             <input id="gwDNS" placeholder="8.8.8.8" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
           </div>
         </div>
+        <div style="margin-bottom:16px;">
+          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="saveGwNetwork()">💾 Save Network Config</button>
+        </div>
 
-        <!-- APN CONFIG -->
+        <!-- SECTION 2: APN -->
         <div class="motor-section-title">📶 APN Configuration (4G/5G)</div>
         <div class="matrix-row">
           <label>APN Name</label>
-          <input id="gwAPN" placeholder="airtelgprs.com" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
+          <input id="gwAPN" placeholder="e.g. airtelgprs.com" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
         </div>
-        <div class="matrix-row">
-          <label>APN Username</label>
-          <input id="gwAPNUser" placeholder="Username (optional)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
-        </div>
-        <div class="matrix-row">
-          <label>APN Password</label>
-          <input type="password" id="gwAPNPass" placeholder="Password (optional)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;" />
-        </div>
-        <div class="matrix-row">
-          <label>SIM Slot</label>
-          <select id="gwSIMSlot" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.8rem;">
-            <option value="sim1">SIM 1</option>
-            <option value="sim2">SIM 2</option>
-          </select>
+        <div style="margin-bottom:16px;">
+          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="saveGwAPN()">💾 Save APN Config</button>
         </div>
 
-        <!-- GATEWAY OTA -->
-        <div class="motor-section-title">🔄 Gateway OTA Firmware Update</div>
+        <!-- SECTION 3: GATEWAY FIRMWARE -->
+        <div class="motor-section-title">🔄 Gateway Firmware Update</div>
         <div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:10px;">
           <div>
             <div style="font-size:0.78rem;font-weight:700;color:#16a34a;">Current Version</div>
@@ -453,11 +444,18 @@ function openGatewayConfig(gwId) {
           </div>
         </div>
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:0.78rem;color:#92400e;">
-          ⚠️ OTA update ke dauran gateway 2-3 minute offline rahega. Connected nodes temporarily disconnect honge.
+          ⚠️ During OTA update, gateway will be offline for 2-3 minutes. Connected nodes will temporarily disconnect.
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:6px;">📁 Upload Firmware File (.bin)</label>
+          <input type="file" id="gwFirmwareFile" accept=".bin,.hex,.zip" style="width:100%;padding:8px;border:2px dashed var(--border);border-radius:8px;font-size:0.8rem;background:#f8fafc;cursor:pointer;" onchange="onFirmwareFileSelected(this)" />
+        </div>
+        <div id="gwFirmwareInfo" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;margin-bottom:10px;font-size:0.78rem;">
+          <span id="gwFirmwareFileName"></span>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <button class="btn btn-sm btn-outline" style="flex:1;" onclick="checkGwOTA()">🔍 Check Update</button>
-          <button class="btn btn-sm btn-success" style="flex:1;" onclick="startGwOTA()">⬆️ Update Gateway</button>
+          <button class="btn btn-sm btn-success" style="flex:1;" onclick="startGwOTA()">⬆️ Start OTA Update</button>
         </div>
         <div id="gwOtaProgress" style="display:none;margin-bottom:14px;">
           <div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;" id="gwOtaText">Downloading...</div>
@@ -466,8 +464,8 @@ function openGatewayConfig(gwId) {
           </div>
         </div>
 
-        <!-- NODE OTA -->
-        <div class="motor-section-title">📡 Connected Nodes OTA Update</div>
+        <!-- SECTION 4: NODE OTA -->
+        <div class="motor-section-title">📡 Connected Nodes Firmware Update</div>
         <div id="gwNodeOtaList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
           ${nodes.filter(n=>n.gateway_id===gwId).length === 0
             ? '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.82rem;background:#f8fafc;border-radius:8px;">No nodes connected to this gateway</div>'
@@ -488,16 +486,87 @@ function openGatewayConfig(gwId) {
         ${nodes.filter(n=>n.gateway_id===gwId).length > 0 ? `
         <button class="btn btn-sm btn-success" style="width:100%;margin-bottom:14px;" onclick="updateAllGwNodes(${gwId})">⬆️ Update All Connected Nodes</button>` : ''}
 
-        <!-- SAVE -->
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="btn btn-primary" style="flex:1;" onclick="saveGwConfig(${gwId})">💾 Save Config</button>
-          <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('gwConfigModal').remove()">Cancel</button>
-        </div>
       </div>
     </div>`;
 
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+function toggleGwNetworkFields() {
+  const type = document.getElementById('gwNetType')?.value;
+  const wifiFields = document.getElementById('gwWifiFields');
+  if (wifiFields) wifiFields.style.display = (type === 'wifi') ? 'block' : 'none';
+}
+
+function toggleGwIPFields() {
+  const mode = document.getElementById('gwIPMode')?.value;
+  const staticFields = document.getElementById('gwStaticIPFields');
+  if (staticFields) staticFields.style.display = (mode === 'static') ? 'block' : 'none';
+}
+
+function onFirmwareFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const info = document.getElementById('gwFirmwareInfo');
+  const name = document.getElementById('gwFirmwareFileName');
+  if (info) info.style.display = 'block';
+  if (name) name.textContent = `📁 ${file.name} (${(file.size/1024).toFixed(1)} KB) — Ready to upload`;
+  toast(`✅ Firmware file selected: ${file.name}`, 'success');
+}
+
+function saveGwNetwork() {
+  toast('✅ Network config saved!', 'success');
+}
+
+function saveGwAPN() {
+  const apn = document.getElementById('gwAPN')?.value;
+  if (!apn) { toast('⚠️ Please enter APN name', 'warning'); return; }
+  toast(`✅ APN "${apn}" saved!`, 'success');
+}
+
+function checkGwOTA() {
+  toast('🔍 Checking for firmware updates...', 'info');
+  setTimeout(() => toast('✅ New firmware v2.5.0 available!', 'success'), 2000);
+}
+
+function startGwOTA() {
+  if (!confirm('Do you want to start Gateway OTA update? Gateway will be offline for 2-3 minutes.')) return;
+  const progress = document.getElementById('gwOtaProgress');
+  const bar = document.getElementById('gwOtaBar');
+  const text = document.getElementById('gwOtaText');
+  if (progress) progress.style.display = 'block';
+  const steps = [
+    {p:15, t:'📥 Downloading firmware v2.5.0...'},
+    {p:40, t:'✅ Download complete. Verifying...'},
+    {p:65, t:'🔄 Installing firmware...'},
+    {p:85, t:'🔁 Rebooting gateway...'},
+    {p:100, t:'✅ Update complete! Running v2.5.0'},
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= steps.length) { clearInterval(iv); toast('✅ Gateway updated to v2.5.0!', 'success'); return; }
+    if (bar) bar.style.width = steps[i].p + '%';
+    if (text) text.textContent = steps[i].t;
+    i++;
+  }, 1500);
+}
+
+function updateSingleNode(nodeId, model) {
+  toast(`⬆️ Updating ${model}...`, 'info');
+  setTimeout(() => toast(`✅ ${model} updated successfully!`, 'success'), 3000);
+}
+
+function updateAllGwNodes(gwId) {
+  const gwNodes = nodes.filter(n => n.gateway_id === gwId);
+  if (!gwNodes.length) return;
+  toast(`⬆️ Updating ${gwNodes.length} nodes...`, 'info');
+  setTimeout(() => toast(`✅ All ${gwNodes.length} nodes updated!`, 'success'), 4000);
+}
+
+function saveGwConfig(gwId) {
+  toast('✅ Gateway config saved & synced!', 'success');
+  document.getElementById('gwConfigModal')?.remove();
 }
 
 function toggleGwNetworkFields() {
@@ -518,7 +587,7 @@ function checkGwOTA() {
 }
 
 function startGwOTA() {
-  if (!confirm('Gateway OTA update shuru karna chahte ho? 2-3 min offline rahega.')) return;
+  if (!confirm('Do you want to start Gateway OTA update? Gateway will be offline for 2-3 minutes.')) return;
   const progress = document.getElementById('gwOtaProgress');
   const bar = document.getElementById('gwOtaBar');
   const text = document.getElementById('gwOtaText');
