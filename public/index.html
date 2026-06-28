@@ -51,11 +51,13 @@
     <nav class="sidebar-nav">
       <div class="nav-section">OVERVIEW</div>
       <div class="nav-item active" data-page="dashboard"><span>📊</span> Dashboard</div>
+      <div class="nav-section">SITES</div>
+      <div class="nav-item" data-page="site-dashboard"><span>🏭</span> Site Dashboard</div>
+      <div class="nav-item" data-page="sites"><span>🗺️</span> Site Mapping</div>
       <div class="nav-section">INVENTORY</div>
       <div class="nav-item" data-page="gateways"><span>📡</span> Gateways</div>
       <div class="nav-item" data-page="nodes"><span>🔌</span> Nodes</div>
       <div class="nav-section">MANAGEMENT</div>
-      <div class="nav-item" data-page="sites"><span>🗺️</span> Site Mapping</div>
       <div class="nav-item" data-page="users"><span>👥</span> Users</div>
       <div class="nav-section">TOOLS</div>
       <div class="nav-item" data-page="import"><span>📦</span> Import / Export</div>
@@ -91,6 +93,10 @@
       </div>
     </div>
 
+    <!-- SITE DASHBOARD -->
+    <div id="page-site-dashboard" class="page">
+    </div>
+
     <!-- GATEWAYS -->
     <div id="page-gateways" class="page">
       <div class="topbar">
@@ -105,7 +111,7 @@
           </div>
           <div class="table-wrap">
             <table id="gwTable">
-              <thead><tr><th>Model</th><th>Serial No</th><th>IMEI</th><th>Radio MAC</th><th>LAN MAC</th><th>WAN MAC</th><th>BLE MAC</th><th>Freq</th><th>Site</th><th>Status</th><th>Action</th></tr></thead>
+              <thead><tr><th>Model</th><th>Serial No</th><th>IMEI</th><th>Radio MAC</th><th>LAN MAC</th><th>WAN MAC</th><th>BLE MAC</th><th>Freq</th><th>Site</th><th>Status</th><th>Config</th><th>Action</th></tr></thead>
               <tbody id="gwBody"></tbody>
             </table>
           </div>
@@ -175,7 +181,7 @@
         <div class="table-card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Action</th></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Site</th><th>Created</th><th>Action</th></tr></thead>
               <tbody id="userBody"></tbody>
             </table>
           </div>
@@ -241,7 +247,6 @@ NVS1001,NV-ND-000001,C1:D2:E3:F4:A5:B6,C1:D2:E3:F4:A5:B7,868MHz,No</pre>
 
   </main>
 </div>
-
 <!-- GATEWAY MODAL -->
 <div id="gwModal" class="modal-overlay" style="display:none">
   <div class="modal">
@@ -324,7 +329,15 @@ NVS1001,NV-ND-000001,C1:D2:E3:F4:A5:B6,C1:D2:E3:F4:A5:B7,868MHz,No</pre>
           <div class="form-group"><label>Email *</label><input type="email" id="uEmail" placeholder="john@neurovibe.ai" required /></div>
           <div class="form-group"><label>Password *</label><input type="password" id="uPassword" placeholder="••••••••" required /></div>
           <div class="form-group"><label>Role</label>
-            <select id="uRole"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+            <select id="uRole">
+              <option value="viewer">Viewer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group full"><label>Assigned Site</label>
+            <select id="uSite">
+              <option value="">All Sites (Admin)</option>
+            </select>
           </div>
         </div>
       </div>
