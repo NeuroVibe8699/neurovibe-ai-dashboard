@@ -28,14 +28,14 @@ const INTERVAL_OPTIONS = [
   { label:'24 Hours',   ms:86400000 },
 ];
 
-let _demoGateways = [];
-let _demoNodes = [];
-let _demoSites = [];
-let _demoUsers = [
+let _demoGateways = JSON.parse(localStorage.getItem('nv_gateways') || '[]');
+let _demoNodes = JSON.parse(localStorage.getItem('nv_nodes') || '[]');
+let _demoSites = JSON.parse(localStorage.getItem('nv_sites') || '[]');
+let _demoUsers = JSON.parse(localStorage.getItem('nv_users') || JSON.stringify([
   { id:1, name:'Admin', email:'admin@neurovibe.ai', role:'admin', created_at: new Date().toISOString() }
-];
-let _demoMotors = {};
-let _demoIdCounter = 100;
+]));
+let _demoMotors = JSON.parse(localStorage.getItem('nv_motors') || '{}');
+let _demoIdCounter = parseInt(localStorage.getItem('nv_counter') || '100');
 
 function demoApi(url, method, body) {
   const newId = () => ++_demoIdCounter;
