@@ -4,6 +4,7 @@ let currentUser = JSON.parse(localStorage.getItem('nv_user') || 'null');
 let gateways = [], nodes = [], sites = [], currentSite = null, addingPin = null, movingPinId = null;
 let sensorChart, deviceChart, tempChart, freqChart;
 let nodeDataCharts = {}, nodeDataInterval = null, currentNodeForData = null, allNodeData = [];
+let currentSiteDashboard = null;
 
 const NODE_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="4" fill="#6366f1"/><rect x="6" y="6" width="4" height="6" rx="1" fill="white"/><rect x="14" y="6" width="4" height="6" rx="1" fill="white"/><rect x="6" y="15" width="12" height="3" rx="1" fill="white"/><rect x="9" y="18" width="2" height="4" fill="#6366f1"/><rect x="13" y="18" width="2" height="4" fill="#6366f1"/></svg>`;
 
@@ -32,34 +33,46 @@ let _demoGateways = JSON.parse(localStorage.getItem('nv_gateways') || '[]');
 let _demoNodes = JSON.parse(localStorage.getItem('nv_nodes') || '[]');
 let _demoSites = JSON.parse(localStorage.getItem('nv_sites') || '[]');
 let _demoUsers = JSON.parse(localStorage.getItem('nv_users') || JSON.stringify([
-  { id:1, name:'Admin', email:'admin@neurovibe.ai', role:'admin', created_at: new Date().toISOString() }
+  { id:1, name:'Admin', email:'admin@neurovibe.ai', role:'admin', site:null, created_at: new Date().toISOString() }
 ]));
 let _demoMotors = JSON.parse(localStorage.getItem('nv_motors') || '{}');
 let _demoIdCounter = parseInt(localStorage.getItem('nv_counter') || '100');
 
+function saveToStorage() {
+  localStorage.setItem('nv_gateways', JSON.stringify(_demoGateways));
+  localStorage.setItem('nv_nodes', JSON.stringify(_demoNodes));
+  localStorage.setItem('nv_sites', JSON.stringify(_demoSites));
+  localStorage.setItem('nv_users', JSON.stringify(_demoUsers));
+  localStorage.setItem('nv_motors', JSON.stringify(_demoMotors));
+  localStorage.setItem('nv_counter', String(_demoIdCounter));
+}
+
 function demoApi(url, method, body) {
   const newId = () => ++_demoIdCounter;
+
   if (url === '/api/dashboard/stats') return Promise.resolve({
     gateways: _demoGateways.length, nodes: _demoNodes.length,
     sites: _demoSites.length, users: _demoUsers.length,
     ai_nodes: _demoNodes.filter(n=>n.is_ai).length,
     motors: Object.values(_demoMotors).flat().length
   });
+
   if (url === '/api/gateways' && method === 'GET') return Promise.resolve([..._demoGateways]);
   if (url === '/api/gateways' && method === 'POST') {
     const gw = { id:newId(), ...body, status:'active' };
-    _demoGateways.unshift(gw); return Promise.resolve(gw);
+    _demoGateways.unshift(gw); saveToStorage(); return Promise.resolve(gw);
   }
   if (url.match(/\/api\/gateways\/\d+/) && method === 'DELETE') {
     const gid = parseInt(url.split('/')[3]);
     _demoGateways = _demoGateways.filter(g=>g.id!==gid);
-    return Promise.resolve({});
+    saveToStorage(); return Promise.resolve({});
   }
+
   if (url === '/api/nodes' && method === 'GET') return Promise.resolve([..._demoNodes]);
   if (url === '/api/nodes' && method === 'POST') {
     const gw = _demoGateways.find(g=>g.id===parseInt(body.gateway_id));
     const nd = { id:newId(), ...body, status:'active', gateway_model: gw?.model||null };
-    _demoNodes.unshift(nd); return Promise.resolve(nd);
+    _demoNodes.unshift(nd); saveToStorage(); return Promise.resolve(nd);
   }
   if (url.match(/\/api\/nodes\/\d+\/motors/) && method === 'GET') {
     const nid = parseInt(url.split('/')[3]);
@@ -69,20 +82,21 @@ function demoApi(url, method, body) {
     const nid = parseInt(url.split('/')[3]);
     const motor = { id:newId(), ...body, health_score:100 };
     if (!_demoMotors[nid]) _demoMotors[nid] = [];
-    _demoMotors[nid].push(motor); return Promise.resolve(motor);
+    _demoMotors[nid].push(motor); saveToStorage(); return Promise.resolve(motor);
   }
   if (url.match(/\/api\/nodes\/\d+/) && method === 'DELETE') {
     const nid = parseInt(url.split('/')[3]);
     _demoNodes = _demoNodes.filter(n=>n.id!==nid);
-    return Promise.resolve({});
+    saveToStorage(); return Promise.resolve({});
   }
+
   if (url.match(/\/api\/motors\/\d+/) && method === 'PUT') {
     const mid = parseInt(url.split('/')[3]);
     for (const nid in _demoMotors) {
       const idx = _demoMotors[nid].findIndex(m=>m.id===mid);
       if (idx !== -1) {
         _demoMotors[nid][idx] = { ..._demoMotors[nid][idx], ...body, id:mid };
-        return Promise.resolve(_demoMotors[nid][idx]);
+        saveToStorage(); return Promise.resolve(_demoMotors[nid][idx]);
       }
     }
     return Promise.resolve({});
@@ -90,29 +104,32 @@ function demoApi(url, method, body) {
   if (url.match(/\/api\/motors\/\d+/) && method === 'DELETE') {
     const mid = parseInt(url.split('/')[3]);
     for (const nid in _demoMotors) _demoMotors[nid] = _demoMotors[nid].filter(m=>m.id!==mid);
-    return Promise.resolve({});
+    saveToStorage(); return Promise.resolve({});
   }
+
   if (url === '/api/sites' && method === 'GET') return Promise.resolve([..._demoSites]);
   if (url === '/api/sites' && method === 'POST') {
     const site = { id:newId(), ...body, map_data:[] };
-    _demoSites.unshift(site); return Promise.resolve(site);
+    _demoSites.unshift(site); saveToStorage(); return Promise.resolve(site);
   }
   if (url.match(/\/api\/sites\/\d+\/map/) && method === 'PUT') {
     const sid = parseInt(url.split('/')[3]);
     const site = _demoSites.find(s=>s.id===sid);
     if (site) site.map_data = body.map_data;
-    return Promise.resolve({});
+    saveToStorage(); return Promise.resolve({});
   }
+
   if (url === '/api/users' && method === 'GET') return Promise.resolve([..._demoUsers]);
   if (url === '/api/users' && method === 'POST') {
     const user = { id:newId(), ...body, created_at: new Date().toISOString() };
-    _demoUsers.push(user); return Promise.resolve(user);
+    _demoUsers.push(user); saveToStorage(); return Promise.resolve(user);
   }
   if (url.match(/\/api\/users\/\d+/) && method === 'DELETE') {
     const uid = parseInt(url.split('/')[3]);
     _demoUsers = _demoUsers.filter(u=>u.id!==uid);
-    return Promise.resolve({});
+    saveToStorage(); return Promise.resolve({});
   }
+
   if (url.match(/\/api\/import\//) && method === 'POST') {
     const type = url.split('/')[3];
     if (type === 'gateways') {
@@ -120,32 +137,48 @@ function demoApi(url, method, body) {
     } else {
       body.rows.forEach(r => { if(r.model) _demoNodes.push({ id:newId(), ...r, status:'active' }); });
     }
-    return Promise.resolve({ imported: body.rows.length });
+    saveToStorage(); return Promise.resolve({ imported: body.rows.length });
   }
+
   return Promise.resolve(null);
 }
 
 const ADMIN_USERS = [
-  { email:'admin@neurovibe.ai', password:'admin@123', name:'Admin', role:'admin' }
+  { email:'admin@neurovibe.ai', password:'admin@123', name:'Admin', role:'admin', site:null }
 ];
 
 document.getElementById('loginForm').addEventListener('submit', e => {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
-  const user = ADMIN_USERS.find(u => u.email === email && u.password === password);
-  if (user) {
+
+  // Check demo admin
+  const adminUser = ADMIN_USERS.find(u => u.email === email && u.password === password);
+  if (adminUser) {
     token = 'demo-token';
-    currentUser = { name:user.name, role:user.role, email:user.email };
+    currentUser = { name:adminUser.name, role:adminUser.role, email:adminUser.email, site:adminUser.site };
     localStorage.setItem('nv_token', token);
     localStorage.setItem('nv_user', JSON.stringify(currentUser));
     document.getElementById('loginError').style.display = 'none';
     showApp();
-  } else {
-    const el = document.getElementById('loginError');
-    el.textContent = '❌ Invalid email or password';
-    el.style.display = 'block';
+    return;
   }
+
+  // Check registered users
+  const regUser = _demoUsers.find(u => u.email === email && u.password === password);
+  if (regUser) {
+    token = 'demo-token';
+    currentUser = { name:regUser.name, role:regUser.role, email:regUser.email, site:regUser.site||null };
+    localStorage.setItem('nv_token', token);
+    localStorage.setItem('nv_user', JSON.stringify(currentUser));
+    document.getElementById('loginError').style.display = 'none';
+    showApp();
+    return;
+  }
+
+  const el = document.getElementById('loginError');
+  el.textContent = '❌ Invalid email or password';
+  el.style.display = 'block';
 });
 
 function logout() {
@@ -161,14 +194,29 @@ async function showApp() {
   document.getElementById('userAvatar').textContent = currentUser.name[0].toUpperCase();
   document.getElementById('sideUserName').textContent = currentUser.name;
   document.getElementById('sideUserRole').textContent = currentUser.role;
+
   if (currentUser.role !== 'admin') {
     document.querySelectorAll('[data-page="users"]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-page="gateways"]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-page="nodes"]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-page="import"]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-page="sites"]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-page="dashboard"]').forEach(el => el.style.display = 'none');
   }
+
   document.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', () => showPage(el.dataset.page));
   });
+
   await loadAll();
-  showPage('dashboard');
+  renderSidebarSites();
+
+  if (currentUser.role === 'admin') {
+    showPage('dashboard');
+  } else {
+    showPage('site-dashboard');
+  }
+
   setInterval(updateClock, 1000); updateClock();
   setInterval(updateCharts, 3000);
 }
@@ -201,6 +249,173 @@ function showPage(page) {
   if (page === 'nodes') renderNodes();
   if (page === 'sites') renderSites();
   if (page === 'users') loadUsers();
+  if (page === 'site-dashboard') renderSiteDashboard();
+}
+
+function renderSidebarSites() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+  const old = document.getElementById('sidebarSitesSection');
+  if (old) old.remove();
+
+  const userSites = currentUser.role === 'admin'
+    ? sites
+    : sites.filter(s => !currentUser.site || s.name === currentUser.site);
+
+  if (userSites.length === 0) return;
+
+  const section = document.createElement('div');
+  section.id = 'sidebarSitesSection';
+  section.innerHTML = `
+    <div class="nav-section">MY SITES</div>
+    ${userSites.map(s => `
+      <div class="nav-item site-nav-item" data-site-id="${s.id}" onclick="openSiteDashboard(${s.id})" style="padding-left:22px;cursor:pointer;">
+        <span>🏭</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;">${s.name}</span>
+        <span style="font-size:0.65rem;background:rgba(99,102,241,0.2);color:#a5b4fc;padding:2px 6px;border-radius:10px;">${nodes.filter(n=>n.site===s.name).length}</span>
+      </div>`).join('')}
+  `;
+  nav.appendChild(section);
+}
+
+function openSiteDashboard(siteId) {
+  currentSiteDashboard = sites.find(s => s.id === siteId);
+  document.querySelectorAll('.site-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-site-id="${siteId}"]`)?.classList.add('active');
+  document.querySelectorAll('.nav-item:not(.site-nav-item)').forEach(el => el.classList.remove('active'));
+  showPage('site-dashboard');
+}
+
+function renderSiteDashboard() {
+  const page = document.getElementById('page-site-dashboard');
+  if (!page) return;
+
+  const userSites = currentUser.role === 'admin'
+    ? sites
+    : sites.filter(s => !currentUser.site || s.name === currentUser.site);
+
+  const site = currentSiteDashboard || (userSites.length > 0 ? userSites[0] : null);
+
+  if (!site) {
+    page.innerHTML = `
+      <div class="topbar"><h1>🏭 Site Dashboard</h1></div>
+      <div class="content" style="display:flex;align-items:center;justify-content:center;flex:1;">
+        <div style="text-align:center;color:var(--muted);">
+          <div style="font-size:3rem;margin-bottom:16px;">🏭</div>
+          <h3>No Sites Available</h3>
+          <p style="margin-top:8px;">Please add a site first</p>
+          ${currentUser.role==='admin'?`<button class="btn btn-primary" style="margin-top:16px;" onclick="showPage('sites')">+ Add Site</button>`:'<p>Contact admin to assign a site</p>'}
+        </div>
+      </div>`;
+    return;
+  }
+
+  currentSiteDashboard = site;
+  const siteGateways = gateways.filter(g => g.site === site.name);
+  const siteNodes = nodes.filter(n => n.site === site.name);
+  const aiNodes = siteNodes.filter(n => n.is_ai);
+  const activeNodes = siteNodes.filter(n => n.status === 'active');
+
+  page.innerHTML = `
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h1>🏭 ${site.name}</h1>
+        ${site.location?`<span style="font-size:0.78rem;color:var(--muted);">📍 ${site.location}</span>`:''}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${currentUser.role === 'admin' && userSites.length > 1 ? `
+        <select onchange="switchSiteDashboard(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;background:#fff;cursor:pointer;">
+          ${userSites.map(s=>`<option value="${s.id}" ${s.id===site.id?'selected':''}>${s.name}</option>`).join('')}
+        </select>` : ''}
+        <span class="topbar-time" id="dashTime"></span>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- STATS -->
+      <div class="stats-grid" style="margin-bottom:20px;">
+        <div class="stat-card" style="--g:linear-gradient(90deg,#6366f1,#8b5cf6)">
+          <div class="stat-label">📡 Gateways</div>
+          <div class="stat-value">${siteGateways.length}</div>
+          <div class="stat-sub">In this site</div>
+        </div>
+        <div class="stat-card" style="--g:linear-gradient(90deg,#10b981,#059669)">
+          <div class="stat-label">🔌 Total Nodes</div>
+          <div class="stat-value">${siteNodes.length}</div>
+          <div class="stat-sub">${aiNodes.length} AI-enabled</div>
+        </div>
+        <div class="stat-card" style="--g:linear-gradient(90deg,#f59e0b,#d97706)">
+          <div class="stat-label">✅ Active Nodes</div>
+          <div class="stat-value">${activeNodes.length}</div>
+          <div class="stat-sub">${siteNodes.length - activeNodes.length} offline</div>
+        </div>
+        <div class="stat-card" style="--g:linear-gradient(90deg,#8b5cf6,#6d28d9)">
+          <div class="stat-label">🤖 AI Nodes</div>
+          <div class="stat-value">${aiNodes.length}</div>
+          <div class="stat-sub">AI-enabled devices</div>
+        </div>
+      </div>
+
+      <!-- GATEWAYS TABLE -->
+      <div class="table-card" style="margin-bottom:20px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="font-size:0.95rem;font-weight:700;">📡 Gateways</h3>
+          <span class="badge badge-blue">${siteGateways.length} total</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>Serial No</th><th>Frequency</th><th>Status</th><th>Config</th></tr></thead>
+            <tbody>
+              ${siteGateways.length === 0
+                ? '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">No gateways in this site</td></tr>'
+                : siteGateways.map(g=>`<tr>
+                    <td><span class="badge badge-blue">${g.model}</span></td>
+                    <td class="mono">${g.serial_no}</td>
+                    <td><span class="badge badge-gray">${g.frequency||'-'}</span></td>
+                    <td><span class="badge ${g.status==='active'?'badge-green':'badge-red'}">${g.status||'active'}</span></td>
+                    <td><button class="btn btn-sm btn-outline" onclick="openGatewayConfig(${g.id})">⚙️ Config</button></td>
+                  </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NODES TABLE -->
+      <div class="table-card">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="font-size:0.95rem;font-weight:700;">🔌 Nodes</h3>
+          <span class="badge badge-purple">${siteNodes.length} total</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>Serial No</th><th>Type</th><th>Gateway</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              ${siteNodes.length === 0
+                ? '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted);">No nodes in this site</td></tr>'
+                : siteNodes.map(n=>`<tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;">${NODE_ICON_SVG}<span class="badge badge-purple">${n.model}</span></div></td>
+                    <td class="mono">${n.serial_no}</td>
+                    <td>${n.is_ai?'<span class="badge badge-ai">🤖 AI</span>':'<span class="badge badge-gray">Standard</span>'}</td>
+                    <td>${n.gateway_model?`<span class="badge badge-blue">${n.gateway_model}</span>`:'-'}</td>
+                    <td><span class="badge ${n.status==='active'?'badge-green':'badge-red'}">${n.status||'active'}</span></td>
+                    <td style="display:flex;gap:6px;">
+                      <button class="btn btn-sm btn-outline" onclick="openCongregation(${n.id})">⚙️ Config</button>
+                      <button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="openNodeData(${n.id})">📊 Data</button>
+                    </td>
+                  </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function switchSiteDashboard(siteId) {
+  currentSiteDashboard = sites.find(s => s.id === parseInt(siteId));
+  renderSiteDashboard();
+  document.querySelectorAll('.site-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-site-id="${siteId}"]`)?.classList.add('active');
 }
 async function renderDashboard() {
   const stats = await api('/api/dashboard/stats') || {};
@@ -286,7 +501,7 @@ async function submitGateway(e) {
   e.preventDefault();
   const body = { model:document.getElementById('gwModel').value, serial_no:document.getElementById('gwSerial').value, imei:document.getElementById('gwIMEI').value, radio_mac:document.getElementById('gwRadioMAC').value, lan_mac:document.getElementById('gwLANMAC').value, wan_mac:document.getElementById('gwWANMAC').value, ble_mac:document.getElementById('gwBLEMAC').value, frequency:document.getElementById('gwFreq').value, site:document.getElementById('gwSite').value };
   const res = await api('/api/gateways','POST',body);
-  if (res&&res.id) { gateways.unshift(res); closeModal('gwModal'); e.target.reset(); renderGateways(); toast('Gateway added!','success'); }
+  if (res&&res.id) { gateways.unshift(res); closeModal('gwModal'); e.target.reset(); renderGateways(); renderSidebarSites(); toast('Gateway added!','success'); }
   else toast('Error adding gateway','error');
 }
 
@@ -303,7 +518,7 @@ function renderNodes() {
   document.getElementById('nodeBody').innerHTML = nodes.length === 0
     ? '<tr><td colspan="10" style="text-align:center;padding:40px;color:#64748b;">No nodes yet.</td></tr>'
     : nodes.map(n => `<tr>
-        <td><div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;">${NODE_ICON_SVG}</span><span class="badge badge-purple">${n.model}</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:8px;">${NODE_ICON_SVG}<span class="badge badge-purple">${n.model}</span></div></td>
         <td class="mono">${n.serial_no}</td>
         <td class="mono">${n.radio_mac||'-'}</td>
         <td class="mono">${n.ble_mac||'-'}</td>
@@ -324,7 +539,7 @@ async function submitNode(e) {
   e.preventDefault();
   const body = { model:document.getElementById('nodeModel').value, serial_no:document.getElementById('nodeSerial').value, radio_mac:document.getElementById('nodeRadioMAC').value, ble_mac:document.getElementById('nodeBLEMAC').value, frequency:document.getElementById('nodeFreq').value, is_ai:document.getElementById('nodeAI').value==='true', gateway_id:document.getElementById('nodeGateway').value||null, site:document.getElementById('nodeSite').value };
   const res = await api('/api/nodes','POST',body);
-  if (res&&res.id) { nodes.unshift(res); closeModal('nodeModal'); e.target.reset(); renderNodes(); toast('Node added!','success'); }
+  if (res&&res.id) { nodes.unshift(res); closeModal('nodeModal'); e.target.reset(); renderNodes(); renderSidebarSites(); toast('Node added!','success'); }
   else toast('Error adding node','error');
 }
 
@@ -444,7 +659,7 @@ function openGatewayConfig(gwId) {
           </div>
         </div>
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:0.78rem;color:#92400e;">
-          ⚠️ During OTA update, gateway will be offline for 2-3 minutes. Connected nodes will temporarily disconnect.
+          ⚠️ During OTA update, gateway will be offline for 2-3 minutes.
         </div>
         <div style="margin-bottom:8px;">
           <label style="font-size:0.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:6px;">📁 Upload Firmware File (.bin)</label>
@@ -546,66 +761,6 @@ function startGwOTA() {
   let i = 0;
   const iv = setInterval(() => {
     if (i >= steps.length) { clearInterval(iv); toast('✅ Gateway updated to v2.5.0!', 'success'); return; }
-    if (bar) bar.style.width = steps[i].p + '%';
-    if (text) text.textContent = steps[i].t;
-    i++;
-  }, 1500);
-}
-
-function updateSingleNode(nodeId, model) {
-  toast(`⬆️ Updating ${model}...`, 'info');
-  setTimeout(() => toast(`✅ ${model} updated successfully!`, 'success'), 3000);
-}
-
-function updateAllGwNodes(gwId) {
-  const gwNodes = nodes.filter(n => n.gateway_id === gwId);
-  if (!gwNodes.length) return;
-  toast(`⬆️ Updating ${gwNodes.length} nodes...`, 'info');
-  setTimeout(() => toast(`✅ All ${gwNodes.length} nodes updated!`, 'success'), 4000);
-}
-
-function saveGwConfig(gwId) {
-  toast('✅ Gateway config saved & synced!', 'success');
-  document.getElementById('gwConfigModal')?.remove();
-}
-
-function toggleGwNetworkFields() {
-  const type = document.getElementById('gwNetType')?.value;
-  const wifiFields = document.getElementById('gwWifiFields');
-  if (wifiFields) wifiFields.style.display = (type === 'wifi') ? 'block' : 'none';
-}
-
-function toggleGwIPFields() {
-  const mode = document.getElementById('gwIPMode')?.value;
-  const staticFields = document.getElementById('gwStaticIPFields');
-  if (staticFields) staticFields.style.display = (mode === 'static') ? 'block' : 'none';
-}
-
-function checkGwOTA() {
-  toast('🔍 Checking for firmware updates...', 'info');
-  setTimeout(() => toast('✅ New firmware v2.5.0 available!', 'success'), 2000);
-}
-
-function startGwOTA() {
-  if (!confirm('Do you want to start Gateway OTA update? Gateway will be offline for 2-3 minutes.')) return;
-  const progress = document.getElementById('gwOtaProgress');
-  const bar = document.getElementById('gwOtaBar');
-  const text = document.getElementById('gwOtaText');
-  if (progress) progress.style.display = 'block';
-  const steps = [
-    {p:15, t:'📥 Downloading firmware v2.5.0...'},
-    {p:40, t:'✅ Download complete. Verifying checksum...'},
-    {p:65, t:'🔄 Installing firmware...'},
-    {p:85, t:'🔁 Rebooting gateway...'},
-    {p:100, t:'✅ Update complete! Running v2.5.0'},
-  ];
-  let i = 0;
-  const iv = setInterval(() => {
-    if (i >= steps.length) {
-      clearInterval(iv);
-      toast('✅ Gateway updated to v2.5.0!', 'success');
-      return;
-    }
     if (bar) bar.style.width = steps[i].p + '%';
     if (text) text.textContent = steps[i].t;
     i++;
@@ -869,6 +1024,7 @@ function renderPtpCards() {
     });
   }, 100);
 }
+
 function updateLiveData() {
   const rand = (min,max) => +(Math.random()*(max-min)+min).toFixed(2);
   const vals = { temp:rand(55,95), vib:rand(1,15), press:rand(1,8), rpm:Math.floor(rand(800,2800)), mag:rand(10,80), ultra:rand(20,90) };
@@ -969,7 +1125,6 @@ function downloadNodeData() {
   }
   toast(`✅ Downloaded: ${node.serial_no} ${year}-${String(month).padStart(2,'0')}`,'success');
 }
-
 let congNode = null, congMotors = [];
 
 async function openCongregation(nodeId) {
@@ -1215,7 +1370,7 @@ function addPinToMap(pin) {
 
 function startMovePin(pinId) {
   movingPinId=pinId;
-  toast('✋ Map pe click karo jahan move karna hai','info');
+  toast('✋ Click on map where you want to move the pin','info');
   document.getElementById('mapCanvas').style.cursor='crosshair';
 }
 
@@ -1226,14 +1381,14 @@ function deletePin(pinId) {
 }
 
 function openPinConfig(nodeId) {
-  if(!nodeId){toast('Node linked nahi hai','warning');return;}
+  if(!nodeId){toast('Node not linked','warning');return;}
   const node=nodes.find(n=>n.id===parseInt(nodeId));
-  if(!node){toast('Node nahi mila!','error');return;}
+  if(!node){toast('Node not found!','error');return;}
   openCongregation(node.id);
 }
 
 function showGatewayNodes(gatewayId) {
-  if(!gatewayId){toast('Gateway linked nahi hai','warning');return;}
+  if(!gatewayId){toast('Gateway not linked','warning');return;}
   const gw=gateways.find(g=>g.id===parseInt(gatewayId));
   const gwNodes=nodes.filter(n=>n.gateway_id===parseInt(gatewayId));
   document.getElementById('gwPopup')?.remove();
@@ -1272,7 +1427,7 @@ document.getElementById('mapCanvas').addEventListener('click', e=>{
     if(p){p.x=x;p.y=y;}
     movingPinId=null;
     document.getElementById('mapCanvas').style.cursor='crosshair';
-    toast('Pin moved! 💾 Save karo.','success');
+    toast('Pin moved! 💾 Save map.','success');
     return;
   }
   if(!addingPin||!currentSite) return;
@@ -1281,13 +1436,13 @@ document.getElementById('mapCanvas').addEventListener('click', e=>{
   let nodeId=null,gatewayId=null;
   if(addingPin==='node'&&nodes.length>0){
     const sel=nodes.map((n,i)=>`${i+1}. ${n.model} - ${n.serial_no}`).join('\n');
-    const choice=prompt(`Konsa node?\n\n${sel}\n\nNumber daalo:`);
+    const choice=prompt(`Which node?\n\n${sel}\n\nEnter number:`);
     const idx=parseInt(choice)-1;
     if(idx>=0&&nodes[idx]) nodeId=nodes[idx].id;
   }
   if(addingPin==='gateway'&&gateways.length>0){
     const sel=gateways.map((g,i)=>`${i+1}. ${g.model} - ${g.serial_no}`).join('\n');
-    const choice=prompt(`Konsa gateway?\n\n${sel}\n\nNumber daalo:`);
+    const choice=prompt(`Which gateway?\n\n${sel}\n\nEnter number:`);
     const idx=parseInt(choice)-1;
     if(idx>=0&&gateways[idx]) gatewayId=gateways[idx].id;
   }
@@ -1308,16 +1463,29 @@ async function submitSite(e) {
   e.preventDefault();
   const body={name:document.getElementById('siteName').value,location:document.getElementById('siteLocation').value,description:document.getElementById('siteDesc').value};
   const res=await api('/api/sites','POST',body);
-  if(res&&res.id){sites.unshift(res);closeModal('siteModal');e.target.reset();renderSites();toast('Site added!','success');}
+  if(res&&res.id){
+    sites.unshift(res);
+    closeModal('siteModal');
+    e.target.reset();
+    renderSites();
+    renderSidebarSites();
+    toast('Site added!','success');
+  }
 }
 
 async function loadUsers() {
   const users=await api('/api/users')||[];
+  const uSite = document.getElementById('uSite');
+  if (uSite) {
+    uSite.innerHTML = '<option value="">All Sites (Admin)</option>' +
+      sites.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  }
   document.getElementById('userBody').innerHTML=users.map(u=>`
     <tr>
       <td><strong>${u.name}</strong></td>
       <td>${u.email}</td>
       <td><span class="badge ${u.role==='admin'?'badge-purple':'badge-gray'}">${u.role}</span></td>
+      <td><span class="badge badge-blue">${u.site||'All Sites'}</span></td>
       <td style="font-size:0.78rem;color:var(--muted);">${new Date(u.created_at).toLocaleDateString('en-IN')}</td>
       <td>${u.email!=='admin@neurovibe.ai'?`<button class="btn-icon" onclick="deleteUser(${u.id})">🗑️</button>`:'-'}</td>
     </tr>`).join('');
@@ -1325,7 +1493,13 @@ async function loadUsers() {
 
 async function submitUser(e) {
   e.preventDefault();
-  const body={name:document.getElementById('uName').value,email:document.getElementById('uEmail').value,password:document.getElementById('uPassword').value,role:document.getElementById('uRole').value};
+  const body={
+    name:document.getElementById('uName').value,
+    email:document.getElementById('uEmail').value,
+    password:document.getElementById('uPassword').value,
+    role:document.getElementById('uRole').value,
+    site:document.getElementById('uSite')?.value||null
+  };
   const res=await api('/api/users','POST',body);
   if(res&&res.id){closeModal('userModal');e.target.reset();loadUsers();toast('User created!','success');}
   else toast(res?.error||'Error','error');
@@ -1352,6 +1526,7 @@ async function importCSV(type,input) {
   const res=await api(`/api/import/${type}`,'POST',{rows});
   toast(`${res?.imported||0} ${type} imported!`,'success');
   await loadAll();
+  renderSidebarSites();
   if(type==='gateways') renderGateways(); else renderNodes();
 }
 
